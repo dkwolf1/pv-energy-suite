@@ -1,0 +1,95 @@
+# Openbaar voorbeeld: alleen PV en Phase Guard, zonder andere persoonlijke apps.
+# Vervang REPLACE_ME en controleer alle voorbeeld-entity-ID's.
+# Dit voorbeeld gebruikt de planner BINNEN PV Grid Forecast.
+pv_grid_forecast:
+  module: pv_grid_forecast
+  class: PVGridForecast
+  planner_enabled: true
+  price_quarter_entity: sensor.zonneplan_current_quarter_hourly_electricity_tariff
+  price_hour_entity: sensor.zonneplan_current_electricity_tariff
+  solcast_today_entity: sensor.solcast_pv_forecast_forecast_today
+  solcast_tomorrow_entity: sensor.solcast_pv_forecast_forecast_tomorrow
+  solcast_power_now_entity: sensor.REPLACE_ME_SOLCAST_POWER_NOW
+  ecu_power_entity: sensor.REPLACE_ME_ECU_POWER
+  ecu_daily_entity: sensor.REPLACE_ME_ECU_DAILY_ENERGY
+  ecu_daily_max_entity: sensor.REPLACE_ME_ECU_DAILY_MAX_POWER
+  grid_import_entity: sensor.power_consumption
+  grid_export_entity: sensor.power_production
+  zonneplan_returned_today_entity: sensor.REPLACE_ME_RETURNED_TODAY
+  zonneplan_consumption_today_entity: sensor.REPLACE_ME_CONSUMPTION_TODAY
+  threshold_entity: input_number.pv_negatieve_prijs_drempel
+  pv_switch_entity: switch.REPLACE_ME_PV_SWITCH
+  automatic_entity: input_boolean.pv_automatisch_afschakelen
+  manual_block_entity: input_boolean.pv_handmatig_geblokkeerd
+  pv_switch_inverted: true  # Pas aan de fysieke relaiswerking aan.
+  peak_power_w: 6000  # Vervang door het AC-maximum van jouw PV-installatie.
+  storage_file: /homeassistant/python_storage/pv_grid_forecast_data.json
+  # De planner publiceert uitsluitend adviezen en bedient geen apparaten.
+  advisory_only: true
+  automation_enabled: false
+  planning_interval_minutes: 15
+  planning_horizon_hours: 24
+  recalculate_interval_minutes: 15
+  pv_safety_margin_pct: 10
+  planner_mqtt_base_topic: pv/self_consumption_planner
+  planner_mqtt_device_id: pv_self_consumption_planner
+  planner_devices:
+    dishwasher:
+      enabled: false  # Zet pas aan als hij werkelijk moet draaien; waarden zijn voorbeelden.
+      enabled_entity: input_boolean.pv_planner_dishwasher_needed
+      name: Vaatwasser
+      mode: fixed_cycle
+      priority: 10
+      duration_minutes: 150
+      duration_minutes_entity: input_number.pv_planner_dishwasher_duration
+      estimated_average_power_w: 440
+      estimated_average_power_w_entity: input_number.pv_planner_dishwasher_average_power
+      estimated_peak_power_w: 2100
+      estimated_peak_power_w_entity: input_number.pv_planner_dishwasher_peak_power
+      power_sensor_entity_entity: input_text.pv_planner_dishwasher_power_sensor
+      earliest_start: "09:00"
+      earliest_start_entity: input_datetime.pv_planner_dishwasher_earliest_start
+      latest_finish: "18:00"
+      latest_finish_entity: input_datetime.pv_planner_dishwasher_latest_finish
+    washing_machine:
+      enabled: false
+      enabled_entity: input_boolean.pv_planner_washing_machine_needed
+      name: Wasmachine
+      mode: fixed_cycle
+      priority: 20
+      duration_minutes: 120
+      duration_minutes_entity: input_number.pv_planner_washing_machine_duration
+      estimated_average_power_w: 425
+      estimated_average_power_w_entity: input_number.pv_planner_washing_machine_average_power
+      estimated_peak_power_w: 2200
+      estimated_peak_power_w_entity: input_number.pv_planner_washing_machine_peak_power
+      power_sensor_entity_entity: input_text.pv_planner_washing_machine_power_sensor
+      earliest_start: "09:00"
+      earliest_start_entity: input_datetime.pv_planner_washing_machine_earliest_start
+      latest_finish: "17:00"
+      latest_finish_entity: input_datetime.pv_planner_washing_machine_latest_finish
+    dryer:
+      enabled: false
+      enabled_entity: input_boolean.pv_planner_dryer_needed
+      name: Droger
+      mode: fixed_cycle
+      priority: 5
+      duration_minutes: 120
+      duration_minutes_entity: input_number.pv_planner_dryer_duration
+      estimated_average_power_w: 800
+      estimated_average_power_w_entity: input_number.pv_planner_dryer_average_power
+      estimated_peak_power_w: 1500
+      estimated_peak_power_w_entity: input_number.pv_planner_dryer_peak_power
+      power_sensor_entity_entity: input_text.pv_planner_dryer_power_sensor
+      earliest_start: "09:00"
+      earliest_start_entity: input_datetime.pv_planner_dryer_earliest_start
+      latest_finish: "20:00"
+      latest_finish_entity: input_datetime.pv_planner_dryer_latest_finish
+
+phase_peak_guard:
+  module: phase_peak_guard
+  class: PhasePeakGuard
+  current_l1: sensor.REPLACE_ME_L1_CURRENT
+  current_l2: sensor.REPLACE_ME_L2_CURRENT
+  current_l3: sensor.REPLACE_ME_L3_CURRENT
+  storage_file: /homeassistant/python_storage/phase_peak_guard.json

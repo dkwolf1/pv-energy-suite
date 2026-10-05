@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+*.tmp
+*.log
+*.json
+apps.yaml
+secrets.yaml
+appdaemon.yaml
+.DS_Store
+Thumbs.db

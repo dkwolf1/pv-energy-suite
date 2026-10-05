@@ -1,0 +1,683 @@
+type: sections
+max_columns: 4
+title: PV Grid Forecast
+path: pv-forecast
+icon: mdi:sun-angle-outline
+dense_section_placement: true
+header:
+  layout: responsive
+  badges_position: bottom
+  badges_wrap: scroll
+  card:
+    type: markdown
+    text_only: true
+    content: >-
+      # PV Grid Forecast
+
+      **{{ states('sensor.pv_grid_forecast_status') }}** · productie, prijs en
+      afschakelresultaat
+    card_mod:
+      style: >
+        ha-card { background: transparent !important; border: 0 !important;
+        box-shadow: none !important; }
+badges:
+  - type: custom:mushroom-template-badge
+    entity: sensor.pv_grid_forecast_status
+    content: '{{ states(entity) }}'
+    icon: mdi:solar-power-variant
+    color: >-
+      {% set s = states(entity) | lower %} {{ 'red' if 'fout' in s or
+      'afschakeling' in s else 'orange' if 'geblokkeerd' in s or 'uit' in s else
+      'amber' if 'data' in s else 'green' }}
+    tap_action:
+      action: more-info
+  - type: custom:mushroom-template-badge
+    entity: sensor.netoverschot_score
+    content: Overschot {{ states(entity) | float(0) | round(0) }}%
+    icon: mdi:transmission-tower
+    color: >-
+      {% set s = states(entity) | float(0) %} {{ 'red' if s >= 80 else 'orange'
+      if s >= 60 else 'amber' if s >= 35 else 'green' }}
+    tap_action:
+      action: more-info
+  - type: custom:mushroom-template-badge
+    entity: binary_sensor.pv_afschakeling_verwacht
+    content: >-
+      {{ 'Afschakeling verwacht' if is_state(entity, 'on') else 'Geen
+      afschakeling' }}
+    icon: mdi:solar-power-variant-outline
+    color: '{{ ''red'' if is_state(entity, ''on'') else ''green'' }}'
+    tap_action:
+      action: more-info
+  - type: custom:mushroom-template-badge
+    entity: binary_sensor.stroom_verbruiken_gunstig
+    content: '{{ ''Verbruik gunstig'' if is_state(entity, ''on'') else ''Niet gunstig'' }}'
+    icon: mdi:home-lightning-bolt-outline
+    color: '{{ ''cyan'' if is_state(entity, ''on'') else ''grey'' }}'
+    tap_action:
+      action: more-info
+sections:
+  - type: grid
+    column_span: 4
+    cards:
+      - type: heading
+        heading: Hoofdstatus
+        heading_style: title
+        icon: mdi:view-dashboard-outline
+      - type: conditional
+        conditions:
+          - entity: binary_sensor.pv_afschakeling_binnen_1_uur
+            state: 'on'
+        card:
+          type: custom:mushroom-template-card
+          entity: binary_sensor.pv_afschakeling_binnen_1_uur
+          primary: PV-afschakeling binnen één uur
+          secondary: De eerstvolgende relevante afschakelperiode begint binnenkort.
+          icon: mdi:alert-octagon
+          icon_color: red
+          multiline_secondary: true
+          tap_action:
+            action: more-info
+          card_mod:
+            style: >
+              ha-card { background: color-mix(in srgb, var(--error-color) 22%,
+              transparent) !important; border: 1px solid var(--error-color)
+              !important; }
+          grid_options:
+            columns: full
+      - type: custom:mushroom-template-card
+        entity: sensor.pv_grid_forecast_status
+        primary: '{{ states(entity) }}'
+        secondary: >-
+          {% set n = states('sensor.netto_vermogen') | float(0) %} {{
+          states('sensor.netstatus') }} · {{ 'teruglevering' if n > 0 else
+          'netafname' if n < 0 else 'in balans' }} {{ n | abs | round(2) }} kW
+        icon: >-
+          {% set s = states(entity) | lower %} {{ 'mdi:alert-octagon' if 'fout'
+          in s else 'mdi:solar-power-variant' if 'afschakeling' in s else
+          'mdi:transmission-tower-export' if states('sensor.netto_vermogen') |
+          float(0) > 0 else 'mdi:transmission-tower-import' }}
+        icon_color: >-
+          {% set s = states(entity) | lower %} {{ 'red' if 'fout' in s or
+          'afschakeling' in s else 'orange' if 'geblokkeerd' in s or 'uit' in s
+          else 'amber' if 'data' in s else 'green' }}
+        multiline_secondary: true
+        tap_action:
+          action: more-info
+        grid_options:
+          columns: full
+        card_mod:
+          style: |
+            ha-card {
+              padding: 12px !important;
+              background: linear-gradient(135deg, color-mix(in srgb, var(--primary-color) 28%, transparent), color-mix(in srgb, var(--card-background-color) 82%, transparent)) !important;
+              border: 1px solid color-mix(in srgb, var(--primary-color) 42%, transparent) !important;
+            }
+      - type: custom:layout-card
+        layout_type: custom:grid-layout
+        layout:
+          grid-template-columns: repeat(4, minmax(0, 1fr))
+          grid-gap: 8px
+          mediaquery:
+            '(max-width: 800px)':
+              grid-template-columns: repeat(2, minmax(0, 1fr))
+            '(max-width: 480px)':
+              grid-template-columns: minmax(0, 1fr)
+        grid_options:
+          columns: full
+        cards:
+          - type: custom:mushroom-template-card
+            entity: sensor.netoverschot_score
+            primary: Netoverschot
+            secondary: '{{ states(entity) | float(0) | round(0) }}%'
+            icon: mdi:gauge
+            icon_color: >-
+              {% set s = states(entity) | float(0) %} {{ 'red' if s >= 80 else
+              'orange' if s >= 60 else 'amber' if s >= 35 else 'green' }}
+            layout: vertical
+            tap_action:
+              action: more-info
+          - type: custom:mushroom-template-card
+            entity: sensor.netstatus
+            primary: Netstatus
+            secondary: '{{ states(entity) }}'
+            icon: mdi:transmission-tower
+            icon_color: blue
+            layout: vertical
+            tap_action:
+              action: more-info
+          - type: custom:mushroom-template-card
+            entity: sensor.netto_vermogen
+            primary: Netto vermogen
+            secondary: >-
+              {% set n = states(entity) | float(0) %} {{ n | round(2) }} kW · {{
+              'teruglevering' if n > 0 else 'afname' if n < 0 else 'balans' }}
+            icon: >-
+              {{ 'mdi:transmission-tower-export' if states(entity) | float(0) >
+              0 else 'mdi:transmission-tower-import' }}
+            icon_color: '{{ ''amber'' if states(entity) | float(0) > 0 else ''blue'' }}'
+            layout: vertical
+            tap_action:
+              action: more-info
+          - type: custom:mushroom-template-card
+            entity: binary_sensor.stroom_verbruiken_gunstig
+            primary: Flexibel verbruik
+            secondary: >-
+              {{ 'Nu gunstig' if is_state(entity, 'on') else 'Nu niet gunstig'
+              }}
+            icon: mdi:flash
+            icon_color: '{{ ''cyan'' if is_state(entity, ''on'') else ''grey'' }}'
+            layout: vertical
+            tap_action:
+              action: more-info
+      - type: custom:mushroom-template-card
+        entity: sensor.verbruiksadvies
+        primary: Verbruiksadvies
+        secondary: '{{ states(entity) }}'
+        icon: mdi:lightbulb-on-outline
+        icon_color: >-
+          {{ 'cyan' if is_state('binary_sensor.stroom_verbruiken_gunstig', 'on')
+          else 'grey' }}
+        multiline_secondary: true
+        tap_action:
+          action: more-info
+        grid_options:
+          columns: full
+  - type: grid
+    column_span: 2
+    cards:
+      - type: heading
+        heading: Financieel vandaag
+        heading_style: title
+        icon: mdi:cash-multiple
+      - type: custom:mushroom-template-card
+        entity: sensor.pv_waarde_vandaag
+        primary: Totale PV-waarde vandaag
+        secondary: >-
+          {% set s = states(entity) %} {{ '—' if s in
+          ['unknown','unavailable','none',''] else '€ ' ~ (s | float(0) |
+          round(2)) }}
+        icon: mdi:currency-eur
+        icon_color: green
+        tap_action:
+          action: more-info
+        card_mod:
+          style: |
+            ha-card {
+              background: linear-gradient(135deg, color-mix(in srgb, var(--success-color) 24%, transparent), color-mix(in srgb, var(--card-background-color) 84%, transparent)) !important;
+              border: 1px solid color-mix(in srgb, var(--success-color) 42%, transparent) !important;
+            }
+      - type: custom:layout-card
+        layout_type: custom:grid-layout
+        layout:
+          grid-template-columns: repeat(3, minmax(0, 1fr))
+          grid-gap: 8px
+          mediaquery:
+            '(max-width: 650px)':
+              grid-template-columns: minmax(0, 1fr)
+        grid_options:
+          columns: full
+        cards:
+          - type: custom:mushroom-template-card
+            entity: sensor.pv_eigen_verbruik_besparing_vandaag
+            primary: Eigen gebruik
+            secondary: € {{ states(entity) | float(0) | round(2) }} bespaard
+            icon: mdi:home-lightning-bolt
+            icon_color: green
+            layout: vertical
+            tap_action:
+              action: more-info
+          - type: custom:mushroom-template-card
+            entity: sensor.pv_terugleveropbrengst_vandaag
+            primary: Teruglevering
+            secondary: >-
+              {% set v = states(entity) | float(0) %} € {{ v | round(2) }} · {{
+              'opbrengst' if v >= 0 else 'kosten' }}
+            icon: mdi:transmission-tower-export
+            icon_color: '{{ ''green'' if states(entity) | float(0) >= 0 else ''red'' }}'
+            layout: vertical
+            tap_action:
+              action: more-info
+          - type: custom:mushroom-template-card
+            entity: sensor.pv_effectieve_terugleverprijs
+            primary: Effectieve prijs
+            secondary: € {{ states(entity) | float(0) | round(4) }}/kWh
+            icon: mdi:cash-sync
+            icon_color: amber
+            layout: vertical
+            tap_action:
+              action: more-info
+  - type: grid
+    column_span: 2
+    cards:
+      - type: heading
+        heading: Werkelijk afschakelresultaat vandaag
+        heading_style: title
+        icon: mdi:solar-power-variant
+      - type: custom:mushroom-template-card
+        entity: sensor.pv_afschakeling_netto_vandaag
+        primary: Nettoresultaat afschakelen
+        secondary: >-
+          {% set v = states(entity) | float(0) %} € {{ v | round(2) }} · {{
+          'bespaard' if v > 0 else 'netto gekost' if v < 0 else 'neutraal' }}
+        icon: mdi:scale-balance
+        icon_color: >-
+          {% set v = states(entity) | float(0) %} {{ 'green' if v > 0 else 'red'
+          if v < 0 else 'grey' }}
+        tap_action:
+          action: more-info
+        card_mod:
+          style: |
+            ha-card {
+              background: linear-gradient(135deg, color-mix(in srgb, var(--primary-color) 20%, transparent), color-mix(in srgb, var(--card-background-color) 86%, transparent)) !important;
+              border: 1px solid color-mix(in srgb, var(--primary-color) 38%, transparent) !important;
+            }
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: custom:mushroom-template-card
+            entity: sensor.pv_afschakeling_besparing_vandaag
+            primary: Vermeden kosten
+            secondary: € {{ states(entity) | float(0) | round(2) }}
+            icon: mdi:cash-check
+            icon_color: green
+            tap_action:
+              action: more-info
+          - type: custom:mushroom-template-card
+            entity: sensor.pv_afschakeling_kosten_vandaag
+            primary: Kosten gemist gebruik
+            secondary: € {{ states(entity) | float(0) | round(2) }}
+            icon: mdi:cash-minus
+            icon_color: red
+            tap_action:
+              action: more-info
+          - type: custom:mushroom-template-card
+            entity: sensor.pv_afgeschakeld_vandaag_kwh
+            primary: Gemiste productie
+            secondary: '{{ states(entity) | float(0) | round(2) }} kWh'
+            icon: mdi:solar-power-variant
+            icon_color: orange
+            tap_action:
+              action: more-info
+          - type: custom:mushroom-template-card
+            entity: sensor.pv_afgeschakeld_vandaag_minuten
+            primary: Afgeschakeld
+            secondary: '{{ states(entity) | float(0) | round(0) }} minuten'
+            icon: mdi:timer-pause-outline
+            icon_color: purple
+            tap_action:
+              action: more-info
+      - type: custom:mushroom-template-card
+        entity: sensor.pv_afschakel_events_vandaag
+        primary: Afschakelevents vandaag
+        secondary: '{{ states(entity) | int(0) }} gebeurtenissen'
+        icon: mdi:counter
+        icon_color: blue
+        tap_action:
+          action: more-info
+  - type: grid
+    column_span: 2
+    cards:
+      - type: heading
+        heading: PV-forecast en verwacht effect
+        heading_style: title
+        icon: mdi:weather-sunny-clock
+      - type: custom:layout-card
+        layout_type: custom:grid-layout
+        layout:
+          grid-template-columns: repeat(3, minmax(0, 1fr))
+          grid-gap: 8px
+          mediaquery:
+            '(max-width: 650px)':
+              grid-template-columns: minmax(0, 1fr)
+        grid_options:
+          columns: full
+        cards:
+          - type: custom:mushroom-template-card
+            entity: sensor.pv_forecast_vandaag
+            primary: Vandaag
+            secondary: '{{ states(entity) | float(0) | round(1) }} kWh'
+            icon: mdi:weather-sunny
+            icon_color: amber
+            layout: vertical
+            tap_action:
+              action: more-info
+          - type: custom:mushroom-template-card
+            entity: sensor.pv_forecast_resterend_vandaag
+            primary: Resterend
+            secondary: '{{ states(entity) | float(0) | round(1) }} kWh'
+            icon: mdi:sun-clock-outline
+            icon_color: orange
+            layout: vertical
+            tap_action:
+              action: more-info
+          - type: custom:mushroom-template-card
+            entity: sensor.pv_forecast_morgen
+            primary: Morgen
+            secondary: '{{ states(entity) | float(0) | round(1) }} kWh'
+            icon: mdi:weather-sunset-up
+            icon_color: yellow
+            layout: vertical
+            tap_action:
+              action: more-info
+      - type: custom:mushroom-template-card
+        entity: sensor.pv_gemiste_productie_verwacht
+        primary: Verwacht gemist bij afschakeling · P50
+        secondary: >-
+          {{ states(entity) | float(0) | round(2) }} kWh · P10–P90 {{
+          states('sensor.pv_gemiste_productie_p10') | float(0) | round(2) }}–{{
+          states('sensor.pv_gemiste_productie_p90') | float(0) | round(2) }} kWh
+        icon: mdi:solar-power-variant
+        icon_color: red
+        multiline_secondary: true
+        tap_action:
+          action: more-info
+      - type: custom:mushroom-template-card
+        entity: sensor.pv_productie_tijdens_afschakeling
+        primary: Productie tijdens afschakelperioden
+        secondary: '{{ states(entity) | float(0) | round(2) }} kWh'
+        icon: mdi:solar-panel
+        icon_color: orange
+        tap_action:
+          action: more-info
+      - type: custom:mushroom-template-card
+        entity: sensor.pv_financieel_effect_verwacht
+        primary: Verwacht effect komende periode · P50
+        secondary: >-
+          {% set v = states(entity) | float(0) %} € {{ v | round(2) }} · P10–P90
+          € {{ states('sensor.pv_financieel_effect_p10') | float(0) | round(2)
+          }}–€ {{ states('sensor.pv_financieel_effect_p90') | float(0) |
+          round(2) }}
+        icon: mdi:cash-clock
+        icon_color: >-
+          {% set v = states(entity) | float(0) %} {{ 'green' if v > 0 else 'red'
+          if v < 0 else 'grey' }}
+        multiline_secondary: true
+        tap_action:
+          action: more-info
+      - type: entities
+        show_header_toggle: false
+        entities:
+          - entity: sensor.pv_gemiste_productie_p10
+            name: Gemiste productie P10
+          - entity: sensor.pv_gemiste_productie_p90
+            name: Gemiste productie P90
+          - entity: sensor.pv_financieel_effect_p10
+            name: Financieel effect P10
+          - entity: sensor.pv_financieel_effect_p90
+            name: Financieel effect P90
+  - type: grid
+    column_span: 2
+    cards:
+      - type: heading
+        heading: Afschakeling en beste verbruiksmoment
+        heading_style: title
+        icon: mdi:calendar-clock
+      - type: custom:mushroom-template-card
+        entity: binary_sensor.pv_afschakeling_verwacht
+        primary: >-
+          {{ 'Afschakeling verwacht' if is_state(entity, 'on') else 'Geen
+          relevante afschakeling verwacht' }}
+        secondary: >-
+          {{ states('sensor.pv_relevante_afschakelkwartieren_24h') | int(0) }}
+          relevante kwartieren · {{ states('sensor.pv_negatieve_kwartieren_24h')
+          | int(0) }} prijsgerelateerde kwartieren
+        icon: mdi:solar-power-variant
+        icon_color: '{{ ''red'' if is_state(entity, ''on'') else ''green'' }}'
+        multiline_secondary: true
+        tap_action:
+          action: more-info
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: custom:mushroom-template-card
+            entity: sensor.pv_volgende_afschakeling
+            primary: Volgende start
+            secondary: |-
+              {% if states(entity) not in ['unknown','unavailable','none',''] %}
+                {{ as_timestamp(states(entity)) | timestamp_custom('%d-%m · %H:%M') }}
+              {% else %}Niet voorspeld{% endif %}
+            icon: mdi:clock-start
+            icon_color: orange
+            tap_action:
+              action: more-info
+          - type: custom:mushroom-template-card
+            entity: sensor.pv_afschakeling_einde
+            primary: Verwacht einde
+            secondary: |-
+              {% if states(entity) not in ['unknown','unavailable','none',''] %}
+                {{ as_timestamp(states(entity)) | timestamp_custom('%d-%m · %H:%M') }}
+              {% else %}Niet voorspeld{% endif %}
+            icon: mdi:clock-end
+            icon_color: green
+            tap_action:
+              action: more-info
+          - type: custom:mushroom-template-card
+            entity: sensor.pv_afschakeling_duur
+            primary: Verwachte duur
+            secondary: '{{ states(entity) | float(0) | round(0) }} minuten'
+            icon: mdi:timer-outline
+            icon_color: purple
+            tap_action:
+              action: more-info
+          - type: custom:mushroom-template-card
+            entity: sensor.pv_relevante_afschakelkwartieren_24h
+            primary: Relevante kwartieren
+            secondary: '{{ states(entity) | int(0) }} kwartieren'
+            icon: mdi:calendar-alert
+            icon_color: red
+            tap_action:
+              action: more-info
+      - type: custom:mushroom-template-card
+        entity: sensor.beste_verbruiksmoment_score
+        primary: >-
+          Beste moment voor flexibel verbruik · {{ states(entity) | float(0) |
+          round(0) }}%
+        secondary: >-
+          {% set start = states('sensor.beste_verbruiksmoment_start') %} {% set
+          einde = states('sensor.beste_verbruiksmoment_einde') %} {% if start
+          not in ['unknown','unavailable','none',''] and einde not in
+          ['unknown','unavailable','none',''] %}
+            {{ as_timestamp(start) | timestamp_custom('%d-%m %H:%M') }} – {{
+            as_timestamp(einde) | timestamp_custom('%H:%M') }}
+          {% else %}Nog geen geschikt venster beschikbaar{% endif %}
+        icon: mdi:calendar-star
+        icon_color: >-
+          {% set s = states(entity) | float(0) %} {{ 'cyan' if s >= 70 else
+          'blue' if s >= 40 else 'grey' }}
+        multiline_secondary: true
+        tap_action:
+          action: more-info
+      - type: entities
+        show_header_toggle: false
+        entities:
+          - entity: sensor.beste_verbruiksmoment_start
+            name: Start verbruiksvenster
+          - entity: sensor.beste_verbruiksmoment_einde
+            name: Einde verbruiksvenster
+          - entity: sensor.pv_negatieve_kwartieren_24h
+            name: Prijsgerelateerde kwartieren
+  - type: grid
+    column_span: 4
+    cards:
+      - type: heading
+        heading: Forecastgrafiek · komende 24 uur
+        heading_style: title
+        icon: mdi:chart-timeline-variant-shimmer
+      - type: custom:apexcharts-card
+        graph_span: 24h
+        span:
+          start: hour
+        header:
+          show: true
+          title: PV, prijs, afschakeling en verbruiksscore
+          show_states: false
+        now:
+          show: true
+          label: Nu
+        apex_config:
+          chart:
+            height: 320
+            toolbar:
+              show: false
+          legend:
+            show: true
+            position: top
+          stroke:
+            curve: smooth
+            width:
+              - 1.4
+              - 1.2
+              - 0
+              - 1.2
+          dataLabels:
+            enabled: false
+          markers:
+            size: 0
+          tooltip:
+            shared: true
+            intersect: false
+          grid:
+            borderColor: rgba(255,255,255,0.10)
+          xaxis:
+            labels:
+              datetimeUTC: false
+        yaxis:
+          - id: pv
+            min: 0
+            decimals: 1
+            apex_config:
+              title:
+                text: PV (kW)
+          - id: price
+            opposite: true
+            decimals: 3
+            apex_config:
+              title:
+                text: Prijs (€/kWh)
+          - id: score
+            min: 0
+            max: 100
+            decimals: 0
+            apex_config:
+              labels:
+                show: false
+              axisBorder:
+                show: false
+              axisTicks:
+                show: false
+        series:
+          - entity: sensor.pv_forecast_tijdlijn
+            name: PV-forecast
+            yaxis_id: pv
+            type: area
+            color: '#fbc02d'
+            opacity: 0.2
+            float_precision: 2
+            data_generator: |
+              const slots = entity.attributes.slots || [];
+              return slots.map((slot) => {
+                const t = new Date(slot.t).getTime();
+                const v = Number(slot.pv);
+                return [t, Number.isFinite(v) ? v : null];
+              }).filter((point) => Number.isFinite(point[0]));
+          - entity: sensor.pv_forecast_tijdlijn
+            name: Elektriciteitsprijs
+            yaxis_id: price
+            type: line
+            color: '#42a5f5'
+            float_precision: 4
+            data_generator: |
+              const slots = entity.attributes.slots || [];
+              return slots.map((slot) => {
+                const t = new Date(slot.t).getTime();
+                const v = Number(slot.p);
+                return [t, Number.isFinite(v) ? v : null];
+              }).filter((point) => Number.isFinite(point[0]));
+          - entity: sensor.pv_forecast_tijdlijn
+            name: Relevante afschakeling
+            yaxis_id: pv
+            type: column
+            color: '#ef5350'
+            opacity: 0.72
+            float_precision: 2
+            data_generator: |
+              const slots = entity.attributes.slots || [];
+              return slots.map((slot) => {
+                const t = new Date(slot.t).getTime();
+                const v = slot.r ? Number(slot.pv) : null;
+                return [t, Number.isFinite(v) ? v : null];
+              }).filter((point) => Number.isFinite(point[0]));
+          - entity: sensor.pv_forecast_tijdlijn
+            name: Gunstig-verbruik-score
+            yaxis_id: score
+            type: line
+            color: '#ab47bc'
+            float_precision: 0
+            data_generator: |
+              const slots = entity.attributes.slots || [];
+              return slots.map((slot) => {
+                const t = new Date(slot.t).getTime();
+                const v = Number(slot.v);
+                return [t, Number.isFinite(v) ? v : null];
+              }).filter((point) => Number.isFinite(point[0]));
+        grid_options:
+          columns: full
+  - type: grid
+    column_span: 4
+    cards:
+      - type: heading
+        heading: Learning en diagnostiek
+        heading_style: title
+        icon: mdi:brain
+      - type: entities
+        show_header_toggle: false
+        grid_options:
+          columns: full
+        entities:
+          - type: custom:fold-entity-row
+            head:
+              type: section
+              label: Learning-details tonen
+            open: false
+            entities:
+              - entity: sensor.pv_forecast_correctiefactor
+                name: Correctiefactor
+              - entity: sensor.pv_forecast_nauwkeurigheid
+                name: Forecastnauwkeurigheid
+              - entity: sensor.pv_forecast_learning_samples
+                name: Geldige samples
+              - entity: sensor.pv_forecast_bias
+                name: Forecastbias
+              - entity: sensor.pv_forecast_mae
+                name: MAE
+              - entity: sensor.pv_forecast_rmse
+                name: RMSE
+              - entity: sensor.pv_observed_ac_ceiling
+                name: Waargenomen AC-plafond
+          - type: custom:fold-entity-row
+            head:
+              type: section
+              label: Zonneplan-historie tonen
+            open: false
+            entities:
+              - entity: sensor.zonneplan_historie_dagen
+                name: Beschikbare historiedagen
+              - entity: sensor.zonneplan_verbruik_jaar
+                name: Jaarverbruik
+              - entity: sensor.zonneplan_teruggeleverd_jaar
+                name: Jaarlijks teruggeleverd
+          - entity: sensor.pv_grid_forecast_status
+            name: Status en technische attributen
+            secondary_info: last-updated
+      - type: markdown
+        content: >-
+          **Let op:** netoverschot en financiële voorspellingen zijn indicatief.
+          Dagresultaten hebben voorrang op historische jaartotalen. Tik op de
+          statusregel voor datakwaliteit, ontbrekende bronnen en de laatste
+          berekening.
+        grid_options:
+          columns: full
+cards: []

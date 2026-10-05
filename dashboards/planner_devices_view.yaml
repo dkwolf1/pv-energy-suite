@@ -1,0 +1,51 @@
+title: Apparaten plannen
+path: apparaten-plannen
+icon: mdi:calendar-clock
+type: masonry
+cards:
+  - type: markdown
+    content: >-
+      Zet **Plannen** alleen aan wanneer het apparaat echt een cyclus moet
+      draaien. Vul de duur en het vermogen van jouw programma in. Heb je een
+      vermogenssensor, vul dan zijn entity-ID in (bijvoorbeeld
+      sensor.vaatwasser_vermogen). De planner leert van afgeronde cycli en
+      geeft startadvies; hij schakelt het apparaat niet in.
+  - type: entities
+    title: Vaatwasser
+    entities:
+      - input_boolean.pv_planner_dishwasher_needed
+      - input_number.pv_planner_dishwasher_duration
+      - input_number.pv_planner_dishwasher_average_power
+      - input_number.pv_planner_dishwasher_peak_power
+      - input_text.pv_planner_dishwasher_power_sensor
+      - input_datetime.pv_planner_dishwasher_earliest_start
+      - input_datetime.pv_planner_dishwasher_latest_finish
+      - sensor.pv_planner_dishwasher_status
+      - sensor.pv_planner_dishwasher_best_start
+      - sensor.pv_planner_dishwasher_reason
+  - type: entities
+    title: Wasmachine
+    entities:
+      - input_boolean.pv_planner_washing_machine_needed
+      - input_number.pv_planner_washing_machine_duration
+      - input_number.pv_planner_washing_machine_average_power
+      - input_number.pv_planner_washing_machine_peak_power
+      - input_text.pv_planner_washing_machine_power_sensor
+      - input_datetime.pv_planner_washing_machine_earliest_start
+      - input_datetime.pv_planner_washing_machine_latest_finish
+      - sensor.pv_planner_washing_machine_status
+      - sensor.pv_planner_washing_machine_best_start
+      - sensor.pv_planner_washing_machine_reason
+  - type: entities
+    title: Droger
+    entities:
+      - input_boolean.pv_planner_dryer_needed
+      - input_number.pv_planner_dryer_duration
+      - input_number.pv_planner_dryer_average_power
+      - input_number.pv_planner_dryer_peak_power
+      - input_text.pv_planner_dryer_power_sensor
+      - input_datetime.pv_planner_dryer_earliest_start
+      - input_datetime.pv_planner_dryer_latest_finish
+      - sensor.pv_planner_dryer_status
+      - sensor.pv_planner_dryer_best_start
+      - sensor.pv_planner_dryer_reason

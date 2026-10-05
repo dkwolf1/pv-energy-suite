@@ -1,0 +1,715 @@
+blueprint:
+  name: "PV – negatieve stroomprijs regeling"
+  description: >
+    Regelt een PV-installatie automatisch op basis van de actuele
+    elektriciteitsprijs.
+
+    - Prijs <= ingestelde drempel: PV UIT.
+    - Prijs > ingestelde drempel: PV AAN.
+    - Ondersteunt geïnverteerde schakellogica.
+    - Minimale schakeltijd geldt voor elke automatische uitschakeling.
+    - Herstelt een foutieve toestand via watchdog.
+    - Controleert de toestand na een Home Assistant-herstart.
+    - Bewaakt de temperatuur van de PV-schakelaar.
+  domain: automation
+  author: "Dennis / dkwolf1"
+  source_url: "https://github.com/dkwolf1/PV-blueprint/blob/main/blueprints/automation/pv_negative_price_control.yaml"
+
+  homeassistant:
+    min_version: "2024.6.0"
+
+  input:
+    pv_configuratie:
+      name: "PV-configuratie"
+      icon: mdi:solar-power
+      input:
+        price_sensor:
+          name: "Elektriciteitsprijs"
+          description: "Sensor met de actuele elektriciteitsprijs in €/kWh."
+          selector:
+            entity:
+              filter:
+                domain: sensor
+
+        pv_switch:
+          name: "PV-schakelaar"
+          description: "Switch die de PV-installatie of PV-contactor schakelt."
+          selector:
+            entity:
+              filter:
+                domain: switch
+
+        inverted_switch:
+          name: "Inverted"
+          description: >
+            Zet deze knop AAN wanneer de gebruikte switch omgekeerd werkt:
+            switch AAN = PV UIT en switch UIT = PV AAN.
+
+            Zet deze knop UIT bij normale schakellogica:
+            switch AAN = PV AAN en switch UIT = PV UIT.
+          default: true
+          selector:
+            boolean:
+
+    regeling:
+      name: "Prijsregeling"
+      icon: mdi:currency-eur
+      input:
+        automatic_enabled:
+          name: "Automatische regeling"
+          description: "Input boolean waarmee de automatische regeling wordt in- of uitgeschakeld."
+          selector:
+            entity:
+              filter:
+                domain: input_boolean
+
+        manual_block:
+          name: "Handmatige blokkering"
+          description: >
+            Wanneer deze input boolean aan staat, wijzigt de automatisering
+            de PV-schakelaar niet.
+          selector:
+            entity:
+              filter:
+                domain: input_boolean
+
+        price_threshold:
+          name: "Negatieve prijsdrempel"
+          description: >
+            Input number met de afschakeldrempel in €/kWh.
+            Bij prijs <= drempel wordt PV uitgeschakeld.
+            Bij prijs > drempel wordt PV ingeschakeld.
+          selector:
+            entity:
+              filter:
+                domain: input_number
+
+    schakelbeveiliging:
+      name: "Schakelbeveiliging"
+      icon: mdi:electric-switch
+      input:
+        last_switched:
+          name: "Laatste schakelmoment"
+          description: "Input datetime waarin het laatste automatische schakelmoment wordt opgeslagen."
+          selector:
+            entity:
+              filter:
+                domain: input_datetime
+
+        minimum_switch_time:
+          name: "Minimale inschakeltijd PV"
+          description: >
+            Input number met het minimale aantal minuten dat PV ingeschakeld
+            moet blijven voordat deze vanwege een lage stroomprijs opnieuw
+            wordt uitgeschakeld. Dit blokkeert opnieuw inschakelen niet.
+          selector:
+            entity:
+              filter:
+                domain: input_number
+
+        startup_delay:
+          name: "Wachttijd na Home Assistant-start"
+          default:
+            minutes: 2
+          selector:
+            duration:
+
+    temperatuurbewaking:
+      name: "Temperatuurbewaking"
+      icon: mdi:thermometer-alert
+      collapsed: true
+      input:
+        temperature_sensor:
+          name: "Temperatuursensor"
+          selector:
+            entity:
+              filter:
+                domain: sensor
+                device_class: temperature
+
+        maximum_temperature:
+          name: "Maximale temperatuur"
+          default: 55
+          selector:
+            number:
+              min: 30
+              max: 100
+              step: 1
+              unit_of_measurement: "°C"
+              mode: box
+
+    meldingen:
+      name: "Meldingen"
+      icon: mdi:bell
+      collapsed: true
+      input:
+        notify_service_1:
+          name: "Notify-service 1"
+          description: "Bijvoorbeeld notify.mobile_app"
+          default: ""
+          selector:
+            text:
+
+        notify_service_2:
+          name: "Notify-service 2"
+          description: "Bijvoorbeeld notify.mobile_app"
+          default: ""
+          selector:
+            text:
+
+        persistent_fault_notification:
+          name: "Persistent notification bij herstelactie"
+          default: true
+          selector:
+            boolean:
+
+variables:
+  price_sensor: !input price_sensor
+  pv_switch: !input pv_switch
+  inverted_switch: !input inverted_switch
+  automatic_enabled: !input automatic_enabled
+  manual_block: !input manual_block
+  price_threshold: !input price_threshold
+  last_switched: !input last_switched
+  minimum_switch_time: !input minimum_switch_time
+  temperature_sensor: !input temperature_sensor
+  notify_service_1: !input notify_service_1
+  notify_service_2: !input notify_service_2
+  persistent_fault_notification: !input persistent_fault_notification
+
+triggers:
+  - trigger: state
+    entity_id: !input price_sensor
+    id: price_changed
+
+  - trigger: state
+    entity_id: !input pv_switch
+    id: switch_changed
+
+  - trigger: homeassistant
+    event: start
+    id: homeassistant_started
+
+  - trigger: time_pattern
+    minutes: "/5"
+    id: watchdog
+
+  - trigger: numeric_state
+    entity_id: !input temperature_sensor
+    above: !input maximum_temperature
+    id: temperature_high
+
+conditions: []
+
+actions:
+  - choose:
+      # ======================================================
+      # PRIJS VERANDERD
+      # ======================================================
+      - conditions:
+          - condition: trigger
+            id: price_changed
+        sequence:
+          - variables:
+              price_valid: >
+                {{
+                  states(price_sensor) not in
+                  ['unknown', 'unavailable', 'none', '']
+                  and is_number(states(price_sensor))
+                }}
+              pv_should_be_off: >
+                {{
+                  states(price_sensor) | float(0)
+                  <=
+                  states(price_threshold) | float(0)
+                }}
+
+          - condition: template
+            value_template: "{{ price_valid }}"
+
+          - condition: template
+            value_template: "{{ is_state(automatic_enabled, 'on') }}"
+
+          - condition: template
+            value_template: "{{ is_state(manual_block, 'off') }}"
+
+          - choose:
+              # PV MOET UIT
+              - conditions:
+                  - condition: template
+                    value_template: "{{ pv_should_be_off }}"
+                sequence:
+                  - condition: template
+                    value_template: >
+                      {% if inverted_switch %}
+                        {{ is_state(pv_switch, 'off') }}
+                      {% else %}
+                        {{ is_state(pv_switch, 'on') }}
+                      {% endif %}
+
+                  - variables:
+                      remaining_seconds: >
+                        {% set laatste = states(last_switched) %}
+                        {% set minimum = states(minimum_switch_time) | float(0) * 60 %}
+                        {% if laatste in ['unknown', 'unavailable', 'none', ''] %}
+                          0
+                        {% else %}
+                          {% set verstreken = as_timestamp(now()) - as_timestamp(laatste, 0) %}
+                          {{ [minimum - verstreken, 0] | max }}
+                        {% endif %}
+
+                  - if:
+                      - condition: template
+                        value_template: "{{ remaining_seconds | float(0) > 0 }}"
+                    then:
+                      - delay:
+                          seconds: "{{ remaining_seconds | int(0) }}"
+
+                  - variables:
+                      price_still_valid: >
+                        {{
+                          states(price_sensor) not in
+                          ['unknown', 'unavailable', 'none', '']
+                          and is_number(states(price_sensor))
+                        }}
+                      still_should_be_off: >
+                        {{
+                          states(price_sensor) | float(0)
+                          <=
+                          states(price_threshold) | float(0)
+                        }}
+
+                  - condition: template
+                    value_template: "{{ price_still_valid }}"
+
+                  - condition: template
+                    value_template: "{{ still_should_be_off }}"
+
+                  - condition: template
+                    value_template: "{{ is_state(automatic_enabled, 'on') }}"
+
+                  - condition: template
+                    value_template: "{{ is_state(manual_block, 'off') }}"
+
+                  - condition: template
+                    value_template: >
+                      {% if inverted_switch %}
+                        {{ is_state(pv_switch, 'off') }}
+                      {% else %}
+                        {{ is_state(pv_switch, 'on') }}
+                      {% endif %}
+
+                  - action: >
+                      {% if inverted_switch %}
+                        switch.turn_on
+                      {% else %}
+                        switch.turn_off
+                      {% endif %}
+                    target:
+                      entity_id: !input pv_switch
+
+                  - action: input_datetime.set_datetime
+                    target:
+                      entity_id: !input last_switched
+                    data:
+                      datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+
+                  - variables:
+                      notification_title: "⚠️ PV wordt uitgeschakeld"
+                      notification_message: >
+                        De stroomprijs is {{ states(price_sensor) | float(0) | round(4) }} €/kWh.
+                        De afschakeldrempel is {{ states(price_threshold) | float(0) | round(4) }} €/kWh.
+                        De zonnepanelen zijn uitgeschakeld.
+
+                  - repeat:
+                      for_each:
+                        - "{{ notify_service_1 }}"
+                        - "{{ notify_service_2 }}"
+                      sequence:
+                        - if:
+                            - condition: template
+                              value_template: >
+                                {{ repeat.item is string and repeat.item | trim != '' }}
+                          then:
+                            - action: "{{ repeat.item }}"
+                              data:
+                                title: "{{ notification_title }}"
+                                message: "{{ notification_message }}"
+
+            # PV MOET AAN
+            default:
+              - condition: template
+                value_template: >
+                  {% if inverted_switch %}
+                    {{ is_state(pv_switch, 'on') }}
+                  {% else %}
+                    {{ is_state(pv_switch, 'off') }}
+                  {% endif %}
+
+              - action: >
+                  {% if inverted_switch %}
+                    switch.turn_off
+                  {% else %}
+                    switch.turn_on
+                  {% endif %}
+                target:
+                  entity_id: !input pv_switch
+
+              - action: input_datetime.set_datetime
+                target:
+                  entity_id: !input last_switched
+                data:
+                  datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+
+              - variables:
+                  notification_title: "☀️ PV weer ingeschakeld"
+                  notification_message: >
+                    De stroomprijs is {{ states(price_sensor) | float(0) | round(4) }} €/kWh.
+                    De afschakeldrempel is {{ states(price_threshold) | float(0) | round(4) }} €/kWh.
+                    De zonnepanelen zijn weer ingeschakeld.
+
+              - repeat:
+                  for_each:
+                    - "{{ notify_service_1 }}"
+                    - "{{ notify_service_2 }}"
+                  sequence:
+                    - if:
+                        - condition: template
+                          value_template: >
+                            {{ repeat.item is string and repeat.item | trim != '' }}
+                      then:
+                        - action: "{{ repeat.item }}"
+                          data:
+                            title: "{{ notification_title }}"
+                            message: "{{ notification_message }}"
+
+      # ======================================================
+      # HOME ASSISTANT HERSTART
+      # ======================================================
+      - conditions:
+          - condition: trigger
+            id: homeassistant_started
+        sequence:
+          - delay: !input startup_delay
+
+          - variables:
+              startup_price_valid: >
+                {{
+                  states(price_sensor) not in
+                  ['unknown', 'unavailable', 'none', '']
+                  and is_number(states(price_sensor))
+                }}
+              desired_switch_state: >
+                {% set moet_uit =
+                  states(price_sensor) | float(0)
+                  <=
+                  states(price_threshold) | float(0)
+                %}
+                {% if moet_uit %}
+                  {% if inverted_switch %}on{% else %}off{% endif %}
+                {% else %}
+                  {% if inverted_switch %}off{% else %}on{% endif %}
+                {% endif %}
+              startup_should_be_off: >
+                {{
+                  states(price_sensor) | float(0)
+                  <=
+                  states(price_threshold) | float(0)
+                }}
+
+          - condition: template
+            value_template: "{{ startup_price_valid }}"
+
+          - condition: template
+            value_template: "{{ is_state(automatic_enabled, 'on') }}"
+
+          - condition: template
+            value_template: "{{ is_state(manual_block, 'off') }}"
+
+          - if:
+              - condition: template
+                value_template: "{{ states(pv_switch) != desired_switch_state }}"
+            then:
+              - variables:
+                  remaining_seconds: >
+                    {% if startup_should_be_off %}
+                      {% set laatste = states(last_switched) %}
+                      {% set minimum = states(minimum_switch_time) | float(0) * 60 %}
+                      {% if laatste in ['unknown', 'unavailable', 'none', ''] %}
+                        0
+                      {% else %}
+                        {% set verstreken = as_timestamp(now()) - as_timestamp(laatste, 0) %}
+                        {{ [minimum - verstreken, 0] | max }}
+                      {% endif %}
+                    {% else %}
+                      0
+                    {% endif %}
+
+              - if:
+                  - condition: template
+                    value_template: "{{ remaining_seconds | float(0) > 0 }}"
+                then:
+                  - delay:
+                      seconds: "{{ remaining_seconds | int(0) }}"
+
+              # Recheck every condition after a possible minimum-time delay.
+              - variables:
+                  startup_price_still_valid: >
+                    {{
+                      states(price_sensor) not in
+                      ['unknown', 'unavailable', 'none', '']
+                      and is_number(states(price_sensor))
+                    }}
+                  desired_switch_state_after_wait: >
+                    {% set moet_uit =
+                      states(price_sensor) | float(0)
+                      <=
+                      states(price_threshold) | float(0)
+                    %}
+                    {% if moet_uit %}
+                      {% if inverted_switch %}on{% else %}off{% endif %}
+                    {% else %}
+                      {% if inverted_switch %}off{% else %}on{% endif %}
+                    {% endif %}
+
+              - condition: template
+                value_template: "{{ startup_price_still_valid }}"
+
+              - condition: template
+                value_template: "{{ is_state(automatic_enabled, 'on') }}"
+
+              - condition: template
+                value_template: "{{ is_state(manual_block, 'off') }}"
+
+              - condition: template
+                value_template: >
+                  {{
+                    states(pv_switch) in ['on', 'off']
+                    and states(pv_switch) != desired_switch_state_after_wait
+                  }}
+
+              - action: >
+                  {% if desired_switch_state_after_wait == 'on' %}
+                    switch.turn_on
+                  {% else %}
+                    switch.turn_off
+                  {% endif %}
+                target:
+                  entity_id: !input pv_switch
+
+              - action: input_datetime.set_datetime
+                target:
+                  entity_id: !input last_switched
+                data:
+                  datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+
+      # ======================================================
+      # WATCHDOG / SCHAKELAARWIJZIGING
+      # ======================================================
+      - conditions:
+          - condition: trigger
+            id:
+              - watchdog
+              - switch_changed
+        sequence:
+          - if:
+              - condition: trigger
+                id: switch_changed
+            then:
+              - delay:
+                  seconds: 2
+
+          - variables:
+              watchdog_price_valid: >
+                {{
+                  states(price_sensor) not in
+                  ['unknown', 'unavailable', 'none', '']
+                  and is_number(states(price_sensor))
+                }}
+              watchdog_should_be_off: >
+                {{
+                  states(price_sensor) | float(0)
+                  <=
+                  states(price_threshold) | float(0)
+                }}
+              expected_switch_state: >
+                {% set moet_uit =
+                  states(price_sensor) | float(0)
+                  <=
+                  states(price_threshold) | float(0)
+                %}
+                {% if moet_uit %}
+                  {% if inverted_switch %}on{% else %}off{% endif %}
+                {% else %}
+                  {% if inverted_switch %}off{% else %}on{% endif %}
+                {% endif %}
+
+          - condition: template
+            value_template: "{{ watchdog_price_valid }}"
+
+          - condition: template
+            value_template: "{{ is_state(automatic_enabled, 'on') }}"
+
+          - condition: template
+            value_template: "{{ is_state(manual_block, 'off') }}"
+
+          - condition: template
+            value_template: >
+              {{
+                states(pv_switch) in ['on', 'off']
+                and states(pv_switch) != expected_switch_state
+              }}
+
+          - variables:
+              remaining_seconds: >
+                {% if watchdog_should_be_off %}
+                  {% set laatste = states(last_switched) %}
+                  {% set minimum = states(minimum_switch_time) | float(0) * 60 %}
+                  {% if laatste in ['unknown', 'unavailable', 'none', ''] %}
+                    0
+                  {% else %}
+                    {% set verstreken = as_timestamp(now()) - as_timestamp(laatste, 0) %}
+                    {{ [minimum - verstreken, 0] | max }}
+                  {% endif %}
+                {% else %}
+                  0
+                {% endif %}
+
+          - if:
+              - condition: template
+                value_template: "{{ remaining_seconds | float(0) > 0 }}"
+            then:
+              - delay:
+                  seconds: "{{ remaining_seconds | int(0) }}"
+
+          # Recheck every condition after a possible minimum-time delay.
+          - variables:
+              watchdog_price_still_valid: >
+                {{
+                  states(price_sensor) not in
+                  ['unknown', 'unavailable', 'none', '']
+                  and is_number(states(price_sensor))
+                }}
+              watchdog_price_after_wait: "{{ states(price_sensor) | float(0) }}"
+              watchdog_threshold_after_wait: "{{ states(price_threshold) | float(0) }}"
+              watchdog_should_be_off_after_wait: >
+                {{
+                  states(price_sensor) | float(0)
+                  <=
+                  states(price_threshold) | float(0)
+                }}
+              expected_switch_state_after_wait: >
+                {% set moet_uit =
+                  states(price_sensor) | float(0)
+                  <=
+                  states(price_threshold) | float(0)
+                %}
+                {% if moet_uit %}
+                  {% if inverted_switch %}on{% else %}off{% endif %}
+                {% else %}
+                  {% if inverted_switch %}off{% else %}on{% endif %}
+                {% endif %}
+
+          - condition: template
+            value_template: "{{ watchdog_price_still_valid }}"
+
+          - condition: template
+            value_template: "{{ is_state(automatic_enabled, 'on') }}"
+
+          - condition: template
+            value_template: "{{ is_state(manual_block, 'off') }}"
+
+          - condition: template
+            value_template: >
+              {{
+                states(pv_switch) in ['on', 'off']
+                and states(pv_switch) != expected_switch_state_after_wait
+              }}
+
+          - variables:
+              old_switch_state: "{{ states(pv_switch) }}"
+              expected_pv_state: >
+                {% if watchdog_should_be_off_after_wait %}UIT{% else %}AAN{% endif %}
+
+          - action: >
+              {% if expected_switch_state_after_wait == 'on' %}
+                switch.turn_on
+              {% else %}
+                switch.turn_off
+              {% endif %}
+            target:
+              entity_id: !input pv_switch
+
+          - action: input_datetime.set_datetime
+            target:
+              entity_id: !input last_switched
+            data:
+              datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+
+          - variables:
+              watchdog_title: "⚠️ PV-toestand automatisch hersteld"
+              watchdog_message: >
+                De PV-installatie stond niet in de verwachte toestand en is automatisch gecorrigeerd.
+                Stroomprijs: {{ watchdog_price_after_wait | round(4) }} €/kWh.
+                Afschakeldrempel: {{ watchdog_threshold_after_wait | round(4) }} €/kWh.
+                Verwachte PV-toestand: {{ expected_pv_state }}.
+                Shelly was: {{ old_switch_state }}.
+                Shelly is gecorrigeerd naar: {{ expected_switch_state_after_wait }}.
+
+          - repeat:
+              for_each:
+                - "{{ notify_service_1 }}"
+                - "{{ notify_service_2 }}"
+              sequence:
+                - if:
+                    - condition: template
+                      value_template: >
+                        {{ repeat.item is string and repeat.item | trim != '' }}
+                  then:
+                    - action: "{{ repeat.item }}"
+                      data:
+                        title: "{{ watchdog_title }}"
+                        message: "{{ watchdog_message }}"
+
+          - if:
+              - condition: template
+                value_template: "{{ persistent_fault_notification }}"
+            then:
+              - action: persistent_notification.create
+                data:
+                  notification_id: pv_watchdog_herstel
+                  title: "{{ watchdog_title }}"
+                  message: "{{ watchdog_message }}"
+
+      # ======================================================
+      # TEMPERATUUR TE HOOG
+      # ======================================================
+      - conditions:
+          - condition: trigger
+            id: temperature_high
+        sequence:
+          - variables:
+              temp_title: "⚠️ PV-schakelaar wordt warm"
+              temp_message: >
+                De temperatuur van
+                {{ state_attr(temperature_sensor, 'friendly_name') or temperature_sensor }}
+                is momenteel {{ states(temperature_sensor) }} °C.
+
+          - repeat:
+              for_each:
+                - "{{ notify_service_1 }}"
+                - "{{ notify_service_2 }}"
+              sequence:
+                - if:
+                    - condition: template
+                      value_template: >
+                        {{ repeat.item is string and repeat.item | trim != '' }}
+                  then:
+                    - action: "{{ repeat.item }}"
+                      data:
+                        title: "{{ temp_title }}"
+                        message: "{{ temp_message }}"
+
+mode: queued
+max: 10
+max_exceeded: warning

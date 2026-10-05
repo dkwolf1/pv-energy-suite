@@ -1,0 +1,71 @@
+# Gebruik dit blok alleen als PV Grid Forecast geen geïntegreerde planner draait.
+# Zet dan pv_grid_forecast.planner_enabled op false of installeer de forecast niet.
+# Voor deze standalone-modus zijn apps/pv_self_consumption.py EN
+# apps/pv_self_consumption_app.py nodig in dezelfde AppDaemon-appsmap.
+pv_self_consumption:
+  module: pv_self_consumption_app
+  class: PVSelfConsumption
+  price_quarter_entity: sensor.zonneplan_current_quarter_hourly_electricity_tariff
+  solcast_today_entity: sensor.solcast_pv_forecast_forecast_today
+  solcast_tomorrow_entity: sensor.solcast_pv_forecast_forecast_tomorrow
+  ecu_power_entity: sensor.REPLACE_ME_ECU_POWER
+  grid_import_entity: sensor.power_consumption  # kW
+  grid_export_entity: sensor.power_production  # kW
+  threshold_entity: input_number.pv_negatieve_prijs_drempel
+  automatic_entity: input_boolean.pv_automatisch_afschakelen
+  manual_block_entity: input_boolean.pv_handmatig_geblokkeerd
+  storage_file: /homeassistant/python_storage/pv_self_consumption_data.json
+  planning_interval_minutes: 15
+  planning_horizon_hours: 24
+  planner_devices:
+    dishwasher:
+      enabled: false
+      enabled_entity: input_boolean.pv_planner_dishwasher_needed
+      name: Vaatwasser
+      mode: fixed_cycle
+      priority: 10
+      duration_minutes: 150
+      duration_minutes_entity: input_number.pv_planner_dishwasher_duration
+      estimated_average_power_w: 440
+      estimated_average_power_w_entity: input_number.pv_planner_dishwasher_average_power
+      estimated_peak_power_w: 2100
+      estimated_peak_power_w_entity: input_number.pv_planner_dishwasher_peak_power
+      power_sensor_entity_entity: input_text.pv_planner_dishwasher_power_sensor
+      earliest_start: "09:00"
+      earliest_start_entity: input_datetime.pv_planner_dishwasher_earliest_start
+      latest_finish: "18:00"
+      latest_finish_entity: input_datetime.pv_planner_dishwasher_latest_finish
+    washing_machine:
+      enabled: false
+      enabled_entity: input_boolean.pv_planner_washing_machine_needed
+      name: Wasmachine
+      mode: fixed_cycle
+      priority: 20
+      duration_minutes: 120
+      duration_minutes_entity: input_number.pv_planner_washing_machine_duration
+      estimated_average_power_w: 425
+      estimated_average_power_w_entity: input_number.pv_planner_washing_machine_average_power
+      estimated_peak_power_w: 2200
+      estimated_peak_power_w_entity: input_number.pv_planner_washing_machine_peak_power
+      power_sensor_entity_entity: input_text.pv_planner_washing_machine_power_sensor
+      earliest_start: "09:00"
+      earliest_start_entity: input_datetime.pv_planner_washing_machine_earliest_start
+      latest_finish: "17:00"
+      latest_finish_entity: input_datetime.pv_planner_washing_machine_latest_finish
+    dryer:
+      enabled: false
+      enabled_entity: input_boolean.pv_planner_dryer_needed
+      name: Droger
+      mode: fixed_cycle
+      priority: 5
+      duration_minutes: 120
+      duration_minutes_entity: input_number.pv_planner_dryer_duration
+      estimated_average_power_w: 800
+      estimated_average_power_w_entity: input_number.pv_planner_dryer_average_power
+      estimated_peak_power_w: 1500
+      estimated_peak_power_w_entity: input_number.pv_planner_dryer_peak_power
+      power_sensor_entity_entity: input_text.pv_planner_dryer_power_sensor
+      earliest_start: "09:00"
+      earliest_start_entity: input_datetime.pv_planner_dryer_earliest_start
+      latest_finish: "20:00"
+      latest_finish_entity: input_datetime.pv_planner_dryer_latest_finish

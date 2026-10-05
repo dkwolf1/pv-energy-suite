@@ -1,0 +1,286 @@
+type: sections
+title: PV
+path: pv-main
+icon: mdi:solar-power-variant
+max_columns: 3
+dense_section_placement: true
+header:
+  card:
+    type: markdown
+    text_only: true
+    content: >-
+      # PV & energie
+
+      De stroomprijs is morgen **{{ 'negatief' if
+      is_state('binary_sensor.zonneplan_negatieve_prijs_morgen', 'on') else
+      'positief' }}**. {{ 'Tijdelijk afschakelen kan financieel gunstig zijn.'
+      if is_state('binary_sensor.zonneplan_negatieve_prijs_morgen', 'on') else
+      'De zonnepanelen kunnen gewoon ingeschakeld blijven.' }}
+
+      Laagste prijs morgen: **{{ states('sensor.zonneplan_laagste_prijs_morgen')
+      if states('sensor.zonneplan_laagste_prijs_morgen') not in
+      ['unknown','unavailable','none'] else 'nog niet bekend' }} €/kWh**
+  layout: center
+  badges_position: top
+  badges_wrap: wrap
+badges:
+  - type: entity
+    entity: sensor.power_consumption
+    name: Verbruik
+    icon: mdi:home-lightning-bolt-outline
+    show_name: true
+    show_state: true
+    show_icon: true
+  - type: entity
+    entity: sensor.power_production
+    name: Productie
+    icon: mdi:solar-power
+    show_name: true
+    show_state: true
+    show_icon: true
+  - type: entity
+    entity: sensor.zonneplan_current_electricity_tariff
+    name: Stroomprijs
+    icon: mdi:currency-eur
+    show_name: true
+    show_state: true
+    show_icon: true
+  - type: entity
+    entity: sensor.zonneplan_terugleververgoeding
+    name: Teruglevering
+    icon: mdi:cash-refund
+    show_name: true
+    show_state: true
+    show_icon: true
+    visibility:
+      - condition: state
+        entity: sun.sun
+        state: above_horizon
+  - type: entity
+    entity: sensor.voltage_gemiddelde
+    name: Netspanning
+    icon: mdi:flash-triangle
+    show_name: true
+    show_state: true
+    show_icon: true
+  - type: entity
+    entity: sensor.replace_me_ecu_inverters_online
+    name: Omvormers
+    icon: mdi:solar-panel-large
+    show_name: true
+    show_state: true
+    show_icon: true
+sections:
+  - type: grid
+    cards:
+      - type: heading
+        heading: Prijs en netbalans
+        heading_style: title
+        icon: mdi:transmission-tower
+      - type: conditional
+        conditions:
+          - entity: binary_sensor.zonneplan_negatieve_prijs_nu
+            state: 'on'
+        card:
+          type: custom:mushroom-template-card
+          entity: binary_sensor.zonneplan_negatieve_prijs_nu
+          primary: Negatieve stroomprijs actief
+          secondary: Terugleveren kost momenteel geld
+          icon: mdi:currency-eur-off
+          icon_color: red
+          badge_icon: mdi:alert
+          badge_color: red
+          card_mod:
+            style: >
+              ha-card { background: rgba(120,20,25,0.55) !important; border: 1px
+              solid rgba(255,82,82,0.65); }
+      - type: conditional
+        conditions:
+          - entity: binary_sensor.zonneplan_negatieve_prijs_binnen_1_uur
+            state: 'on'
+        card:
+          type: custom:mushroom-template-card
+          entity: binary_sensor.zonneplan_negatieve_prijs_binnen_1_uur
+          primary: Negatieve prijs binnen één uur
+          secondary: Controleer de automatische PV-regeling
+          icon: mdi:timer-alert-outline
+          icon_color: amber
+      - graph: line
+        type: sensor
+        entity: sensor.live_stroom_saldo
+        name: Live stroom saldo
+        detail: 2
+        icon: mdi:cash-sync
+        hours_to_show: 24
+        grid_options:
+          columns: 12
+          rows: 3
+      - graph: line
+        type: sensor
+        entity: sensor.zonneplan_terugleververgoeding
+        name: Terugleververgoeding
+        detail: 2
+        icon: mdi:cash-refund
+        hours_to_show: 24
+        visibility:
+          - condition: state
+            entity: sun.sun
+            state: above_horizon
+        grid_options:
+          columns: 12
+          rows: 3
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: custom:mushroom-template-card
+            entity: sensor.zonneplan_current_electricity_tariff
+            primary: Huidige prijs
+            secondary: >-
+              {{ states(entity) }} {{ state_attr(entity, 'unit_of_measurement')
+              or '€/kWh' }}
+            icon: mdi:currency-eur
+            icon_color: amber
+            layout: vertical
+            tap_action:
+              action: more-info
+          - type: custom:mushroom-template-card
+            entity: sensor.zonneplan_laagste_prijs_morgen
+            primary: Laagste morgen
+            secondary: >-
+              {{ states(entity) }} {{ state_attr(entity, 'unit_of_measurement')
+              or '€/kWh' }}
+            icon: mdi:calendar-arrow-down
+            icon_color: cyan
+            layout: vertical
+            tap_action:
+              action: more-info
+      - type: entities
+        title: Prijssignalen
+        icon: mdi:chart-timeline-variant
+        show_header_toggle: false
+        state_color: true
+        entities:
+          - entity: sensor.zonneplan_laagste_prijs_morgen
+            name: Laagste prijs morgen
+          - entity: sensor.zonneplan_terugleververgoeding
+            name: Terugleververgoeding
+          - entity: sensor.zonneplan_eerstvolgende_negatieve_prijs
+            name: Eerstvolgende negatieve prijs
+          - entity: binary_sensor.zonneplan_negatieve_prijs_nu
+            name: Negatieve prijs nu
+          - entity: binary_sensor.zonneplan_negatieve_prijs_morgen
+            name: Negatieve prijs morgen
+          - entity: binary_sensor.zonneplan_negatieve_prijs_binnen_1_uur
+            name: Negatieve prijs binnen één uur
+  - type: grid
+    cards:
+      - type: heading
+        heading: Zon en opbrengst
+        heading_style: title
+        icon: mdi:white-balance-sunny
+      - type: custom:solar-forecast-card
+        show_header: true
+        display_estimate10: false
+        device_id: REPLACE_WITH_YOUR_FORECAST_SOLAR_DEVICE_ID
+        integration_type: forecast_solar
+        forecast_entities:
+          - sensor.energy_production_today
+          - sensor.energy_production_tomorrow
+          - ''
+          - ''
+          - ''
+          - ''
+          - ''
+        export_rate_entity: sensor.zonneplan_terugleververgoeding
+        live_power_entity: sensor.replace_me_ecu_current_power
+        today_actual_entity: sensor.replace_me_ecu_daily_energy_production
+        date_format: DD/MM
+        time_format: 24h
+        show_hourly_as_main: false
+        inverter_max_kw: 5.0
+        solar_max_kwp: 6.0
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: custom:mushroom-template-card
+            entity: sensor.replace_me_ecu_current_power
+            primary: Productie nu
+            secondary: >-
+              {{ states(entity) }} {{ state_attr(entity, 'unit_of_measurement')
+              or 'W' }}
+            icon: mdi:solar-power
+            icon_color: amber
+            layout: vertical
+            tap_action:
+              action: more-info
+          - type: custom:mushroom-template-card
+            entity: sensor.replace_me_ecu_daily_energy_production
+            primary: Vandaag
+            secondary: >-
+              {{ states(entity) }} {{ state_attr(entity, 'unit_of_measurement')
+              or 'kWh' }}
+            icon: mdi:solar-panel-large
+            icon_color: orange
+            layout: vertical
+            tap_action:
+              action: more-info
+      - type: energy-distribution
+  - type: grid
+    cards:
+      - type: heading
+        heading: Regeling en hardware
+        heading_style: title
+        icon: mdi:cog-outline
+      - type: entities
+        title: Automatische afschakeling
+        icon: mdi:solar-power-variant-outline
+        show_header_toggle: false
+        state_color: true
+        entities:
+          - type: custom:restriction-card
+            row: true
+            restrictions:
+              confirm:
+                text: Zeker weten dat je de zonnepanelen uitschakelt?
+            card:
+              entity: switch.replace_me_pv_switch
+              name: PV-schakelaar (controleer richting)
+              icon: mdi:solar-power
+          - entity: binary_sensor.zonneplan_negatieve_prijs_nu
+            name: Negatieve prijs nu
+          - entity: binary_sensor.zonneplan_negatieve_prijs_binnen_1_uur
+            name: Negatieve prijs binnen één uur
+          - entity: input_boolean.pv_handmatig_geblokkeerd
+            name: Handmatig geblokkeerd
+          - entity: input_boolean.pv_automatisch_afschakelen
+            name: Automatisch afschakelen
+      - type: entities
+        title: PV-omvormer
+        icon: mdi:access-point
+        show_header_toggle: false
+        state_color: true
+        entities:
+          - entity: sensor.replace_me_ecu_current_power
+            name: Huidige productie
+          - entity: sensor.replace_me_ecu_daily_energy_production
+            name: Productie vandaag
+          - entity: sensor.replace_me_ecu_daily_max_power
+            name: Maximaal vermogen vandaag
+          - entity: sensor.replace_me_ecu_inverters_online
+            name: Omvormers online
+            icon: mdi:solar-panel-large
+      - type: entities
+        title: PV-relais
+        icon: mdi:electric-switch
+        show_header_toggle: false
+        state_color: true
+        entities:
+          - entity: update.replace_me_pv_switch_firmware
+            name: Firmware
+          - entity: sensor.replace_me_pv_switch_temperature
+            name: Temperatuur
+          - entity: binary_sensor.replace_me_pv_switch_restart_required
+            name: Herstart vereist
+cards: []

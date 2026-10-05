@@ -1,0 +1,109 @@
+# Home Assistant package-voorbeeld. Activeer packages in configuration.yaml:
+# homeassistant:
+#   packages: !include_dir_named packages
+# Plaats daarna dit bestand als packages/pv_planner_helpers.yaml.
+# Vul de helpers na het aanmaken zelf in. Zonder 'initial' bewaren ze hun
+# gewijzigde waarde na een Home Assistant-herstart.
+input_boolean:
+  pv_planner_dishwasher_needed:
+    name: Vaatwasser plannen
+    icon: mdi:dishwasher
+  pv_planner_washing_machine_needed:
+    name: Wasmachine plannen
+    icon: mdi:washing-machine
+  pv_planner_dryer_needed:
+    name: Droger plannen
+    icon: mdi:tumble-dryer
+
+input_text:
+  pv_planner_dishwasher_power_sensor:
+    name: Vaatwasser vermogenssensor (entity-ID)
+    max: 100
+  pv_planner_washing_machine_power_sensor:
+    name: Wasmachine vermogenssensor (entity-ID)
+    max: 100
+  pv_planner_dryer_power_sensor:
+    name: Droger vermogenssensor (entity-ID)
+    max: 100
+
+input_number:
+  pv_planner_dishwasher_duration:
+    name: Vaatwasser duur
+    min: 15
+    max: 480
+    step: 5
+    unit_of_measurement: min
+  pv_planner_dishwasher_average_power:
+    name: Vaatwasser gemiddeld vermogen
+    min: 1
+    max: 5000
+    step: 25
+    unit_of_measurement: W
+  pv_planner_dishwasher_peak_power:
+    name: Vaatwasser piekvermogen
+    min: 1
+    max: 10000
+    step: 50
+    unit_of_measurement: W
+  pv_planner_washing_machine_duration:
+    name: Wasmachine duur
+    min: 15
+    max: 480
+    step: 5
+    unit_of_measurement: min
+  pv_planner_washing_machine_average_power:
+    name: Wasmachine gemiddeld vermogen
+    min: 1
+    max: 5000
+    step: 25
+    unit_of_measurement: W
+  pv_planner_washing_machine_peak_power:
+    name: Wasmachine piekvermogen
+    min: 1
+    max: 10000
+    step: 50
+    unit_of_measurement: W
+  pv_planner_dryer_duration:
+    name: Droger duur
+    min: 15
+    max: 480
+    step: 5
+    unit_of_measurement: min
+  pv_planner_dryer_average_power:
+    name: Droger gemiddeld vermogen
+    min: 1
+    max: 5000
+    step: 25
+    unit_of_measurement: W
+  pv_planner_dryer_peak_power:
+    name: Droger piekvermogen
+    min: 1
+    max: 10000
+    step: 50
+    unit_of_measurement: W
+
+input_datetime:
+  pv_planner_dishwasher_earliest_start:
+    name: Vaatwasser vanaf
+    has_date: false
+    has_time: true
+  pv_planner_dishwasher_latest_finish:
+    name: Vaatwasser klaar voor
+    has_date: false
+    has_time: true
+  pv_planner_washing_machine_earliest_start:
+    name: Wasmachine vanaf
+    has_date: false
+    has_time: true
+  pv_planner_washing_machine_latest_finish:
+    name: Wasmachine klaar voor
+    has_date: false
+    has_time: true
+  pv_planner_dryer_earliest_start:
+    name: Droger vanaf
+    has_date: false
+    has_time: true
+  pv_planner_dryer_latest_finish:
+    name: Droger klaar voor
+    has_date: false
+    has_time: true
