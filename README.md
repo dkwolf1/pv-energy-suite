@@ -1,5 +1,7 @@
 # PV Energy Suite
 
+**Nederlands** · [English](README.en.md)
+
 De vier voorbeeldviews en hun entiteitenchecklist staan in
 [`dashboards/`](dashboards/). De publieke voorbeelden bevatten geen lokale
 theme, achtergrond of apparaat-ID's.
@@ -98,7 +100,7 @@ integraties kunnen andere entity-ID's toekennen.
 | Phase Guard | Drie fase-stroomsensoren (A), of per fase een gedocumenteerde vermogensfallback | Nee: vul `current_l1/l2/l3` of de fallback in. |
 | MQTT-dashboarduitvoer | `sensor.pv_*`, `sensor.pv_planner_*`, `sensor.phase_guard_*` en de bijbehorende binary sensors | **Ja**, via MQTT Discovery wanneer de betreffende app en MQTT-integratie actief zijn. Maak ze niet als helpers aan. |
 
-De drie [dashboardviews](dashboards/README.md) hebben een aparte checklist
+De vier [dashboardviews](dashboards/README.md) hebben een aparte checklist
 voor alle extra entiteiten en frontend-kaarten.
 
 ## Gedeelde contracten
