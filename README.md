@@ -14,6 +14,12 @@ PV Energy Suite combineert een PV- en prijsverwachting, advies voor apparaten, f
 4. Kies één manier om apparaten in te stellen: **vaste waarden in YAML** voor een snelle test, of **Home Assistant-helpers** voor bediening via een dashboard. Beide routes staan hieronder.
 5. Herstart AppDaemon. Controleer de log en daarna de door MQTT Discovery aangemaakte `sensor.pv_*` en `sensor.pv_planner_*` entiteiten.
 
+**Heb je al een werkende AppDaemon-installatie?** Maak eerst een back-up van je
+bestaande `apps.yaml` en Python-bestanden. Vervang voor de geïntegreerde planner
+`pv_grid_forecast.py` en `pv_self_consumption.py` **samen** door de versies uit
+deze repo. Voeg daarna alleen de ontbrekende regels binnen je bestaande
+`pv_grid_forecast:`-blok toe. Andere AppDaemon-apps hoeven niet weg.
+
 ### Welke bronnen vul je zelf in?
 
 | Bron | Nodig voor | Verwachte waarde |
@@ -45,9 +51,30 @@ Verwijder bij één apparaat alle velden die eindigen op `_entity` uit zijn `pla
    ```
 
 2. Kopieer [examples/planner_helpers.yaml.example](examples/planner_helpers.yaml.example) naar `packages/pv_planner_helpers.yaml` in de **Home Assistant-configuratiemap**; verwijder de extensie `.example`. Herstart Home Assistant en controleer of de helpers bestaan.
-3. Houd de zeven `*_entity`-verwijzingen per apparaat uit [examples/apps.yaml.example](examples/apps.yaml.example) in je **AppDaemon** `apps.yaml`. De zes basishelpers regelen vraag aan/uit, duur, gemiddeld vermogen, piekvermogen, vroegste start en uiterste eindtijd. De zevende teksthelper is optioneel voor een vermogenssensor.
+3. Voeg de zeven `*_entity`-verwijzingen per apparaat uit [examples/apps.yaml.example](examples/apps.yaml.example) toe onder `pv_grid_forecast → planner_devices` in je **AppDaemon** `apps.yaml`. De zes basishelpers regelen vraag aan/uit, duur, gemiddeld vermogen, piekvermogen, vroegste start en uiterste eindtijd. De zevende teksthelper is optioneel voor een vermogenssensor. **Alleen de helpers en het dashboard installeren koppelt de knoppen nog niet aan de planner.**
 4. Voeg [dashboards/planner_devices_view.yaml](dashboards/planner_devices_view.yaml) als **view** toe in een Home Assistant-dashboard. Dit is geen complete dashboardconfiguratie.
 5. Vul de helpers in. Zet **Plannen** alleen aan wanneer een programma echt moet draaien; zet de knop na starten of afronden weer uit. Anders blijft het apparaat in volgend advies verschijnen.
+
+Voor één apparaat ziet de koppeling er bijvoorbeeld zo uit. De overige
+profielvelden (`name`, `mode`, `priority` en de vaste voorbeeldwaarden) staan
+in [apps.yaml.example](examples/apps.yaml.example):
+
+```yaml
+planner_devices:
+  dishwasher:
+    enabled: false
+    enabled_entity: input_boolean.pv_planner_dishwasher_needed
+    duration_minutes_entity: input_number.pv_planner_dishwasher_duration
+    estimated_average_power_w_entity: input_number.pv_planner_dishwasher_average_power
+    estimated_peak_power_w_entity: input_number.pv_planner_dishwasher_peak_power
+    earliest_start_entity: input_datetime.pv_planner_dishwasher_earliest_start
+    latest_finish_entity: input_datetime.pv_planner_dishwasher_latest_finish
+    power_sensor_entity_entity: input_text.pv_planner_dishwasher_power_sensor
+```
+
+Zet ook voor wasmachine en droger een eigen profiel in `planner_devices` als
+hun kaarten in het dashboard staan. `enabled: false` is veilig als startwaarde:
+met `enabled_entity` bepaalt daarna de Home Assistant-knop de vraag.
 
 Ontbreekt een vereiste helper of bevat een getal een ongeldige waarde, dan wordt dat apparaat niet gepland. De planner schakelt het apparaat nooit zelf in.
 
@@ -82,5 +109,18 @@ De vier [dashboardvoorbeelden en hun entiteitenchecklist](dashboards/README.md) 
 - Controleer de bronentiteiten en hun eenheden: ECU-PV in W, P1-import/export in kW, Solcast `detailedForecast` in kW.
 - Bewaar bestaande JSON-learningbestanden bij een upgrade. Geef zelfstandige apps elk hun eigen opslagpad.
 - Een ontbrekende bron kan `insufficient_data` opleveren; de planner wist dan zijn actuele advies.
+
+### Als het dashboard niet overeenkomt met de knoppen
+
+| Wat zie je? | Controleer dit |
+|---|---|
+| Knop uit, maar het apparaat heeft nog een gepland advies | Staat `enabled_entity` in het juiste apparaatprofiel, en draaien de twee Python-bestanden uit deze repo? Herstart AppDaemon na de wijziging. |
+| `Entiteit niet gevonden` bij wasmachine of droger | Voeg hun profielen met `enabled_entity` toe aan `planner_devices` en herstart AppDaemon. MQTT Discovery maakt dan hun adviessensoren aan. |
+| `unknown` bij de optionele vermogenssensor | Dit mag als je geen aparte sensor hebt; de handmatig ingevulde W-waarden blijven gelden. |
+| Tijden op `00:00` of vermogens op minimum | Vul eerst echte programmaduur, W-waarden en tijden in. Zet de vraagknop daarna pas aan. |
+
+Als de brondata beschikbaar zijn en de planner opnieuw heeft berekend, hoort
+een uitgeschakelde knop `disabled` als apparaatstatus te geven. Controleer bij afwijkingen de
+AppDaemon-log en de feitelijke entity-ID's in Home Assistant.
 
 De losse projecten blijven beschikbaar als [PV-blueprint](https://github.com/dkwolf1/PV-blueprint), [PV-grid-forecast](https://github.com/dkwolf1/PV-grid-forecast) en [phase-peak-guard](https://github.com/dkwolf1/phase-peak-guard).

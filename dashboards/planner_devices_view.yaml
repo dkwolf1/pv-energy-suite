@@ -9,43 +9,75 @@ cards:
       draaien. Vul de duur en het vermogen van jouw programma in. Heb je een
       vermogenssensor, vul dan zijn entity-ID in (bijvoorbeeld
       sensor.vaatwasser_vermogen). De planner leert van afgeronde cycli en
-      geeft startadvies; hij schakelt het apparaat niet in.
+      geeft startadvies; hij schakelt het apparaat niet in. Vul eerst duur,
+      vermogen en tijden in. "unknown" bij vermogenssensor is prima als je
+      geen aparte sensor hebt; laat Plannen dan uit tot de andere waarden kloppen.
   - type: entities
     title: Vaatwasser
     entities:
-      - input_boolean.pv_planner_dishwasher_needed
-      - input_number.pv_planner_dishwasher_duration
-      - input_number.pv_planner_dishwasher_average_power
-      - input_number.pv_planner_dishwasher_peak_power
-      - input_text.pv_planner_dishwasher_power_sensor
-      - input_datetime.pv_planner_dishwasher_earliest_start
-      - input_datetime.pv_planner_dishwasher_latest_finish
-      - sensor.pv_planner_dishwasher_status
-      - sensor.pv_planner_dishwasher_best_start
-      - sensor.pv_planner_dishwasher_reason
+      - entity: input_boolean.pv_planner_dishwasher_needed
+        name: Plannen
+      - entity: input_number.pv_planner_dishwasher_duration
+        name: Duur (min)
+      - entity: input_number.pv_planner_dishwasher_average_power
+        name: Gemiddeld (W)
+      - entity: input_number.pv_planner_dishwasher_peak_power
+        name: Piek (W)
+      - entity: input_text.pv_planner_dishwasher_power_sensor
+        name: Vermogenssensor (optioneel)
+      - entity: input_datetime.pv_planner_dishwasher_earliest_start
+        name: Vanaf
+      - entity: input_datetime.pv_planner_dishwasher_latest_finish
+        name: Klaar voor
+      - entity: sensor.pv_planner_dishwasher_status
+        name: Adviesstatus
+      - entity: sensor.pv_planner_dishwasher_best_start
+        name: Beste start
+      - entity: sensor.pv_planner_dishwasher_reason
+        name: Uitleg
   - type: entities
     title: Wasmachine
     entities:
-      - input_boolean.pv_planner_washing_machine_needed
-      - input_number.pv_planner_washing_machine_duration
-      - input_number.pv_planner_washing_machine_average_power
-      - input_number.pv_planner_washing_machine_peak_power
-      - input_text.pv_planner_washing_machine_power_sensor
-      - input_datetime.pv_planner_washing_machine_earliest_start
-      - input_datetime.pv_planner_washing_machine_latest_finish
-      - sensor.pv_planner_washing_machine_status
-      - sensor.pv_planner_washing_machine_best_start
-      - sensor.pv_planner_washing_machine_reason
+      - entity: input_boolean.pv_planner_washing_machine_needed
+        name: Plannen
+      - entity: input_number.pv_planner_washing_machine_duration
+        name: Duur (min)
+      - entity: input_number.pv_planner_washing_machine_average_power
+        name: Gemiddeld (W)
+      - entity: input_number.pv_planner_washing_machine_peak_power
+        name: Piek (W)
+      - entity: input_text.pv_planner_washing_machine_power_sensor
+        name: Vermogenssensor (optioneel)
+      - entity: input_datetime.pv_planner_washing_machine_earliest_start
+        name: Vanaf
+      - entity: input_datetime.pv_planner_washing_machine_latest_finish
+        name: Klaar voor
+      - entity: sensor.pv_planner_washing_machine_status
+        name: Adviesstatus
+      - entity: sensor.pv_planner_washing_machine_best_start
+        name: Beste start
+      - entity: sensor.pv_planner_washing_machine_reason
+        name: Uitleg
   - type: entities
     title: Droger
     entities:
-      - input_boolean.pv_planner_dryer_needed
-      - input_number.pv_planner_dryer_duration
-      - input_number.pv_planner_dryer_average_power
-      - input_number.pv_planner_dryer_peak_power
-      - input_text.pv_planner_dryer_power_sensor
-      - input_datetime.pv_planner_dryer_earliest_start
-      - input_datetime.pv_planner_dryer_latest_finish
-      - sensor.pv_planner_dryer_status
-      - sensor.pv_planner_dryer_best_start
-      - sensor.pv_planner_dryer_reason
+      - entity: input_boolean.pv_planner_dryer_needed
+        name: Plannen
+      - entity: input_number.pv_planner_dryer_duration
+        name: Duur (min)
+      - entity: input_number.pv_planner_dryer_average_power
+        name: Gemiddeld (W)
+      - entity: input_number.pv_planner_dryer_peak_power
+        name: Piek (W)
+      - entity: input_text.pv_planner_dryer_power_sensor
+        name: Vermogenssensor (optioneel)
+      - entity: input_datetime.pv_planner_dryer_earliest_start
+        name: Vanaf
+      - entity: input_datetime.pv_planner_dryer_latest_finish
+        name: Klaar voor
+      - entity: sensor.pv_planner_dryer_status
+        name: Adviesstatus
+      - entity: sensor.pv_planner_dryer_best_start
+        name: Beste start
+      - entity: sensor.pv_planner_dryer_reason
+        name: Uitleg

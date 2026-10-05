@@ -14,6 +14,12 @@ PV Energy Suite combines PV and price forecasting, appliance start-time advice, 
 4. Choose one appliance setup: **fixed YAML values** for a quick test, or **Home Assistant helpers** for dashboard controls. Both routes are explained below.
 5. Restart AppDaemon. Check its log, then check the `sensor.pv_*` and `sensor.pv_planner_*` entities created through MQTT Discovery.
 
+**Already have a working AppDaemon installation?** Back up your existing
+`apps.yaml` and Python files first. For the integrated planner, replace
+`pv_grid_forecast.py` and `pv_self_consumption.py` **together** with the versions
+from this repository. Then add only the missing lines inside your existing
+`pv_grid_forecast:` block. Keep your other AppDaemon apps.
+
 ### Which inputs do you provide?
 
 | Input | Used by | Expected value |
@@ -45,9 +51,30 @@ Remove every field ending in `_entity` from one appliance's `planner_devices` bl
    ```
 
 2. Copy [examples/planner_helpers.yaml.example](examples/planner_helpers.yaml.example) to `packages/pv_planner_helpers.yaml` in the **Home Assistant configuration directory**; remove the `.example` suffix. Restart Home Assistant and check that the helpers exist.
-3. Keep the seven `*_entity` references per appliance from [examples/apps.yaml.example](examples/apps.yaml.example) in your **AppDaemon** `apps.yaml`. Six basic helpers cover planning request, duration, average power, peak power, earliest start and latest finish. The seventh text helper is optional for a power sensor.
+3. Add the seven `*_entity` references per appliance from [examples/apps.yaml.example](examples/apps.yaml.example) under `pv_grid_forecast → planner_devices` in your **AppDaemon** `apps.yaml`. Six basic helpers cover planning request, duration, average power, peak power, earliest start and latest finish. The seventh text helper is optional for a power sensor. **Installing only the helpers and dashboard does not connect their controls to the planner.**
 4. Add [dashboards/planner_devices_view.yaml](dashboards/planner_devices_view.yaml) as a **view** in a Home Assistant dashboard. It is not a complete dashboard configuration.
 5. Fill in the helpers. Turn **Plan** on only when a program needs to run; turn it off after starting or completing the cycle. Otherwise the appliance will continue to appear in new advice.
+
+For one appliance, the connection looks like this. The other profile fields
+(`name`, `mode`, `priority` and fixed fallback values) are in
+[apps.yaml.example](examples/apps.yaml.example):
+
+```yaml
+planner_devices:
+  dishwasher:
+    enabled: false
+    enabled_entity: input_boolean.pv_planner_dishwasher_needed
+    duration_minutes_entity: input_number.pv_planner_dishwasher_duration
+    estimated_average_power_w_entity: input_number.pv_planner_dishwasher_average_power
+    estimated_peak_power_w_entity: input_number.pv_planner_dishwasher_peak_power
+    earliest_start_entity: input_datetime.pv_planner_dishwasher_earliest_start
+    latest_finish_entity: input_datetime.pv_planner_dishwasher_latest_finish
+    power_sensor_entity_entity: input_text.pv_planner_dishwasher_power_sensor
+```
+
+Add separate washing-machine and dryer profiles under `planner_devices` if
+their dashboard cards are present. `enabled: false` is a safe starting value:
+with `enabled_entity`, the Home Assistant toggle controls demand instead.
 
 If a required helper is missing or a numeric value is invalid, that appliance is not planned. The planner never starts the appliance.
 
@@ -82,5 +109,18 @@ The four [example dashboard views and entity checklist](dashboards/README.md) ar
 - Check source entities and units: ECU PV in W, P1 import/export in kW, Solcast `detailedForecast` in kW.
 - Keep existing JSON learning files when upgrading. Give standalone apps separate storage paths.
 - Missing source data can produce `insufficient_data`; the planner then clears its current advice.
+
+### If the dashboard does not match the toggles
+
+| What you see | What to check |
+|---|---|
+| Toggle off, but an appliance is still scheduled | Is `enabled_entity` present in the matching appliance profile, and are both Python files from this repository installed? Restart AppDaemon after changing them. |
+| `Entity not found` for washing machine or dryer | Add their profiles with `enabled_entity` under `planner_devices` and restart AppDaemon. MQTT Discovery then creates their advice sensors. |
+| `unknown` in the optional power-sensor field | This is fine if you have no separate sensor; the manual W values remain in use. |
+| Times show `00:00` or power values are at the minimum | Enter real program duration, W values and time limits before turning on the planning request. |
+
+When source data is available and the planner has recalculated, an off toggle
+should result in `disabled` as that appliance's status. If it does not,
+check the AppDaemon log and the actual entity IDs in Home Assistant.
 
 The original projects remain available as [PV-blueprint](https://github.com/dkwolf1/PV-blueprint), [PV-grid-forecast](https://github.com/dkwolf1/PV-grid-forecast) and [phase-peak-guard](https://github.com/dkwolf1/phase-peak-guard).

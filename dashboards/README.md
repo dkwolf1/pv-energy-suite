@@ -16,6 +16,13 @@ voor MQTT Discovery-entiteiten als een naam al bezet is.
 | Phase Guard | [`phase_guard_view.yaml`](phase_guard_view.yaml) | Phase Peak Guard, MQTT-integratie en drie fasebronnen | Geen extra kaarten |
 | Apparaten plannen | [`planner_devices_view.yaml`](planner_devices_view.yaml) | Planner, MQTT-integratie en de helpers uit [`planner_helpers.yaml.example`](../examples/planner_helpers.yaml.example) | Geen extra kaarten |
 
+Voor **Apparaten plannen** moeten drie delen overeenkomen: de helpers in Home
+Assistant, de `*_entity`-verwijzingen per apparaat in AppDaemon `apps.yaml` en
+de planner-Python-bestanden uit deze repo. Alleen de view en helpers plaatsen
+maakt nog geen koppeling. De kaarten voor wasmachine en droger verwachten ook
+een eigen `planner_devices`-profiel; zonder dat profiel ontbreken hun
+MQTT-adviessensoren. Zie de [installatiestappen](../README.md#optie-b--helpers-en-dashboard).
+
 De extra kaarten zijn frontend-uitbreidingen. Als die niet geïnstalleerd zijn,
 toont Home Assistant voor de betreffende kaart een fout. De kaart
 `energy-distribution` in het PV-overzicht gebruikt de Home Assistant
