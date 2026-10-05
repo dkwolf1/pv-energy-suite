@@ -2,135 +2,85 @@
 
 **Nederlands** · [English](README.en.md)
 
-De vier voorbeeldviews en hun entiteitenchecklist staan in
-[`dashboards/`](dashboards/). De publieke voorbeelden bevatten geen lokale
-theme, achtergrond of apparaat-ID's.
+PV Energy Suite combineert een PV- en prijsverwachting, advies voor apparaten, fasebewaking en een blueprint voor schakelen bij negatieve stroomprijzen. Elk onderdeel is apart te gebruiken.
 
-Een samenhangend pakket van vier onafhankelijke Home Assistant-onderdelen:
+## Begin hier
 
-| Onderdeel | Bestand | Werkt zelfstandig? | Samenwerking |
-|---|---|---|---|
-| PV-schakeling | `blueprints/automation/pv_negative_price_control.yaml` | Ja | Leest dezelfde drempel en blokkering als de forecast. Alleen dit onderdeel bedient de Shelly. |
-| PV-forecast | `apps/pv_grid_forecast.py` | Ja | Levert voorspellingen en kan de planner intern draaien. |
-| Verbruiksplanner | `apps/pv_self_consumption_app.py` + `apps/pv_self_consumption.py` | Ja | Kan zelfstandig Solcast, Zonneplan, ECU en P1 lezen, of als module in de forecast draaien. Geeft uitsluitend advies. |
-| Phase guard | `apps/phase_peak_guard.py` | Ja | Publiceert fase-headroom voor dashboards en menselijke besluitvorming. Bedient niets. |
+**Wil je eerst alleen testen?** Gebruik PV Grid Forecast met de geïntegreerde planner. Je hebt AppDaemon, de Home Assistant MQTT-integratie en passende prijs-, PV- en netmetingen nodig. De planner geeft advies en schakelt geen apparaten.
 
-## Installeren
+1. Kopieer [apps/pv_grid_forecast.py](apps/pv_grid_forecast.py) en [apps/pv_self_consumption.py](apps/pv_self_consumption.py) naar de map waarin jouw AppDaemon `apps.yaml` staat.
+2. Open je **bestaande** AppDaemon `apps.yaml`. Gebruik alleen het blok `pv_grid_forecast:` uit [examples/apps.yaml.example](examples/apps.yaml.example) als voorbeeld. Overschrijf je bestaande bestand niet. Zet `planner_enabled: true` en voeg **geen** apart blok `pv_self_consumption:` toe.
+3. Vervang alle gebruikte voorbeeldentiteiten en `REPLACE_ME`-waarden door je eigen entity-ID's. Controleer in Home Assistant onder **Ontwikkelaarstools → Statussen** of ze bestaan. De belangrijkste bronnen staan in de tabel hieronder.
+4. Kies één manier om apparaten in te stellen: **vaste waarden in YAML** voor een snelle test, of **Home Assistant-helpers** voor bediening via een dashboard. Beide routes staan hieronder.
+5. Herstart AppDaemon. Controleer de log en daarna de door MQTT Discovery aangemaakte `sensor.pv_*` en `sensor.pv_planner_*` entiteiten.
 
-Kopieer alleen de onderdelen die je gebruikt naar de AppDaemon-appsmap. Voor de
-zelfstandige planner zijn **beide** `pv_self_consumption*.py`-bestanden nodig.
-Voor de forecast is `pv_self_consumption.py` alleen nodig als
-`planner_enabled: true` staat. De blueprint wordt afzonderlijk in Home
-Assistant geïmporteerd; er is geen AppDaemon-app voor de Shelly nodig.
+### Welke bronnen vul je zelf in?
 
-Neem de benodigde blokken over uit [`examples/apps.yaml.example`](examples/apps.yaml.example).
-Vul de entity-ID's en opslagpaden in. Gebruik bij de planner precies één modus:
-
-1. **Geïntegreerd:** `pv_grid_forecast.planner_enabled: true`; laat het blok
-   `pv_self_consumption:` weg.
-2. **Zelfstandig:** `pv_grid_forecast.planner_enabled: false` of laat de
-   forecast weg; gebruik [`standalone_planner.yaml.example`](examples/standalone_planner.yaml.example).
-   De zelfstandige planner
-   gebruikt ruwe Solcast P50 zonder de learning-correctie van PV Grid Forecast.
-
-Beide modi publiceren dezelfde MQTT Discovery-ID's en topics voor de planner.
-Gelijktijdig draaien veroorzaakt conflicten in Home Assistant. De planner
-schakelt geen apparaat, ook niet als de forecast of phase guard is geïnstalleerd.
-
-## Apparaten via Home Assistant instellen
-
-De voorbeelden bevatten drie apparaatprofielen: vaatwasser, wasmachine en
-droger. Hun waarden zijn **plaatsaanduidingen**, geen metingen van jouw
-apparaten. Met [`planner_helpers.yaml.example`](examples/planner_helpers.yaml.example)
-maak je per apparaat zeven helpers aan: vraag aan/uit, programmaduur in minuten,
-gemiddeld vermogen in W, piekvermogen in W, vroegste start, uiterste eindtijd
-en optioneel de entity-ID van een vermogenssensor. Het voorbeeld is een Home Assistant-package. Voeg dit toe aan
-`configuration.yaml`:
-
-```yaml
-homeassistant:
-  packages: !include_dir_named packages
-```
-
-Kopieer het helperbestand daarna naar `packages/pv_planner_helpers.yaml`
-zonder `.example` en herstart Home Assistant.
-Kopieer daarna de [apparatenview](dashboards/planner_devices_view.yaml) naar
-een dashboard en gebruik de `*_entity`-velden in je AppDaemon-configuratie.
-Gebruik de pakketversies van de Python-bestanden voor deze helperfunctie.
-
-Een vermogenssensor is optioneel. Vul in de teksthelper een `sensor.*`-ID in,
-of zet rechtstreeks `power_sensor_entity: sensor.jouw_apparaat_vermogen` in
-het apparaatprofiel. De sensor moet actueel vermogen in **W** of **kW** meten.
-De planner bemonstert hem elke minuut en gebruikt pas na een afgeronde cyclus
-het gemeten gemiddelde en piekvermogen voor volgend advies. Tot dan gelden
-de handmatig ingevulde waarden. Een momentane 0 W terwijl het apparaat uit
-staat wordt dus niet als voorspeld programmavermogen gebruikt. De
-programmaduur blijft een handmatige instelling, omdat verschillende
-programma's op hetzelfde apparaat anders kunnen duren. Kies per profiel
-een sensor die alleen dat apparaat meet.
-
-Zet de vraagknop alleen aan wanneer een programma echt gepland moet worden.
-Zolang de knop aan staat, verschijnt het apparaat opnieuw in het dagelijkse
-advies; zet hem na starten of afronden weer uit. De planner bedient geen
-apparaten. Als een helper ontbreekt of een getal ongeldig is, wordt dat
-apparaat niet gepland. Een profiel zonder `*_entity`-velden blijft werken met
-vaste YAML-waarden; `enabled: true` betekent dan blijvende vraag.
-
-Voor een **vierde apparaat**: kopieer één `planner_devices`-blok, geef het een
-nieuwe unieke sleutel, voeg zeven helpers met eigen ID's toe in het
-helpervoorbeeld, pas de zeven `*_entity`-verwijzingen aan en kopieer de
-bijbehorende kaart in de apparatenview. De sleutel is ook onderdeel van de
-MQTT-sensor-ID's. Gebruik voor `duration_minutes` de duur van het gekozen
-programma. Schat `estimated_average_power_w` uit gemeten kWh × 1000 gedeeld
-door programmaduur in uren; meet het piekvermogen indien mogelijk apart.
-Kies een deadline die binnen de ingestelde forecast-horizon valt.
-
-## Welke entiteiten moet je zelf invullen?
-
-De waarden in [`apps.yaml.example`](examples/apps.yaml.example) zijn
-**voorbeelden**, geen automatisch aangemaakte entiteiten. Vervang elke
-`REPLACE_ME`-waarde. Controleer ook de overige voorbeeld-ID's in Home Assistant:
-integraties kunnen andere entity-ID's toekennen.
-
-| Onderdeel | Zelf benodigde bron of helper | Wordt door het pakket gemaakt? |
+| Bron | Nodig voor | Verwachte waarde |
 |---|---|---|
-| Blueprint | Actuele prijs (€/kWh), PV-schakelaar, automatische-regeling- en handmatige-blokkering-helpers, prijsdrempel, laatste schakelmoment, minimale schakeltijd; temperatuursensor en notificatie optioneel | Nee: kies eigen integraties en maak de helpers zelf. |
-| PV Grid Forecast | Zonneplan-kwartierprijzen (`forecast`), Solcast vandaag/morgen (`detailedForecast`), ECU actueel vermogen (W), P1-import en -export (kW); voor learning en financiën ook Solcast actueel vermogen, ECU dagenergie/dagmaximum en Zonneplan dagmeters | Nee: vul deze onder `pv_grid_forecast:` in. |
-| Zelfstandige verbruiksplanner | Zonneplan-kwartierprijzen, Solcast vandaag/morgen, ECU actueel vermogen en P1-import/-export; gedeelde regeling-helpers voor verwachte PV-afschakeling | Nee: vul deze onder `pv_self_consumption:` in. Een apparaatprofiel is pas bruikbaar na controle van duur, vermogen en deadline. |
-| Phase Guard | Drie fase-stroomsensoren (A), of per fase een gedocumenteerde vermogensfallback | Nee: vul `current_l1/l2/l3` of de fallback in. |
-| MQTT-dashboarduitvoer | `sensor.pv_*`, `sensor.pv_planner_*`, `sensor.phase_guard_*` en de bijbehorende binary sensors | **Ja**, via MQTT Discovery wanneer de betreffende app en MQTT-integratie actief zijn. Maak ze niet als helpers aan. |
+| Zonneplan kwartierprijzen | Forecast en planner | `forecast`-attribuut met kwartierprijzen |
+| Solcast vandaag en morgen | Forecast en planner | `detailedForecast`-attribuut |
+| ECU/omvormer actueel PV-vermogen | Forecast en planner | W |
+| P1 netimport en netexport | Forecast en planner | kW |
+| Drempel, automatische regeling en handmatige blokkering | Voorspelling van PV-afschakeling | Home Assistant-helpers |
+| Extra ECU- en Zonneplan-dagsensoren | Learning- en financiële functies van de forecast | Zie de velden in het voorbeeldbestand |
 
-De vier [dashboardviews](dashboards/README.md) hebben een aparte checklist
-voor alle extra entiteiten en frontend-kaarten.
+De namen in het voorbeeld zijn geen universele Home Assistant-entity-ID's. AppDaemon maakt deze **bronentiteiten niet** aan. De forecast en planner publiceren hun **uitvoer** via MQTT Discovery; maak `sensor.pv_*` en `sensor.pv_planner_*` dus niet zelf als helpers aan.
 
-## Gedeelde contracten
+## Kies hoe je apparaten invult
 
-- **PV-schakeling:** de blueprint is de enige schrijver van de PV-Shelly.
-  De forecast en planner lezen `input_number.pv_negatieve_prijs_drempel`,
-  `input_boolean.pv_automatisch_afschakelen` en
-  `input_boolean.pv_handmatig_geblokkeerd` voor hun voorspelling.
-- **Metingen:** ECU-PV is W; P1-import en -export zijn kW. Positief netvermogen
-  betekent import. Solcast `detailedForecast` is kW. Zonneplan
-  `forecast[].price_tax_included.amount` wordt gedeeld door 10.000.000 voor €/kWh.
-- **Phase guard:** houdt eigen opslag en MQTT-device. Er is geen directe
-  fase-toewijzing aan de apparaatprofielen; gebruik de globale headroom niet
-  als harde startbeveiliging voor een onbekende fase.
-- **Opslag:** elke zelfstandige app heeft een eigen JSON-bestand. Deel deze
-  paden niet tussen apps. Bewaar bestaande learningbestanden bij upgrades.
+Het voorbeeld bevat vaatwasser, wasmachine en droger. Programmaduur en vermogen zijn voorbeeldwaarden; meet of controleer ze voor jouw apparaat.
 
-## Ingebruikname
+### Optie A — snel testen met vaste YAML-waarden
 
-Controleer de AppDaemon-log op fouten, daarna de status van de MQTT-devices.
-Verifieer de blueprint-schakelrichting (`inverted_switch`) met de werkelijke
-Shelly-bedrading. De voorbeeldapparaten in de planner zijn **adviezen**;
-controleer programmaduur, energie en deadline voordat je ze inschakelt.
-De standalone planner heeft Zonneplan-kwartierprijzen, Solcast vandaag/morgen,
-actuele ECU-productie en P1-import/-export nodig. Bij ontbrekende brondata
-publiceert hij `insufficient_data` en wist hij de planning.
+Verwijder bij één apparaat alle velden die eindigen op `_entity` uit zijn `planner_devices`-blok. Vul `duration_minutes`, `estimated_average_power_w`, `estimated_peak_power_w`, `earliest_start` en `latest_finish` in en zet `enabled: true`. Met vaste YAML-waarden blijft het apparaat elke dag in het advies staan totdat je `enabled` weer uitzet. De overige apparaten mogen `enabled: false` blijven.
 
-De originele repositories blijven bruikbaar als losse onderdelen:
-[PV-blueprint](https://github.com/dkwolf1/PV-blueprint),
-[PV-grid-forecast](https://github.com/dkwolf1/PV-grid-forecast) en
-[phase-peak-guard](https://github.com/dkwolf1/phase-peak-guard).
-Deze map is de gezamenlijke distributie. De actieve lokale configuratie staat
-in `../appdaemon_apps/apps.yaml` en wordt niet als generiek voorbeeld gebruikt.
+### Optie B — helpers en dashboard
+
+1. Schakel Home Assistant-packages in. Voeg onder de **bestaande** `homeassistant:`-sectie van `configuration.yaml` de regel `packages: !include_dir_named packages` toe. Bestaat die sectie nog niet, dan ziet het er zo uit:
+
+   ```yaml
+   homeassistant:
+     packages: !include_dir_named packages
+   ```
+
+2. Kopieer [examples/planner_helpers.yaml.example](examples/planner_helpers.yaml.example) naar `packages/pv_planner_helpers.yaml` in de **Home Assistant-configuratiemap**; verwijder de extensie `.example`. Herstart Home Assistant en controleer of de helpers bestaan.
+3. Houd de zeven `*_entity`-verwijzingen per apparaat uit [examples/apps.yaml.example](examples/apps.yaml.example) in je **AppDaemon** `apps.yaml`. De zes basishelpers regelen vraag aan/uit, duur, gemiddeld vermogen, piekvermogen, vroegste start en uiterste eindtijd. De zevende teksthelper is optioneel voor een vermogenssensor.
+4. Voeg [dashboards/planner_devices_view.yaml](dashboards/planner_devices_view.yaml) als **view** toe in een Home Assistant-dashboard. Dit is geen complete dashboardconfiguratie.
+5. Vul de helpers in. Zet **Plannen** alleen aan wanneer een programma echt moet draaien; zet de knop na starten of afronden weer uit. Anders blijft het apparaat in volgend advies verschijnen.
+
+Ontbreekt een vereiste helper of bevat een getal een ongeldige waarde, dan wordt dat apparaat niet gepland. De planner schakelt het apparaat nooit zelf in.
+
+### Optionele vermogenssensor
+
+Vul in de teksthelper een entity-ID zoals `sensor.vaatwasser_vermogen` in, of zet `power_sensor_entity: sensor.vaatwasser_vermogen` rechtstreeks in het apparaatprofiel. De sensor moet alleen dat apparaat meten en actueel vermogen in **W of kW** leveren. De planner bemonstert hem elke minuut. Na een afgeronde cyclus gebruikt hij het gemeten gemiddelde en waargenomen piekvermogen voor volgend advies. Tot dan gelden de handmatig ingevulde waarden; 0 W terwijl het apparaat uit staat wordt niet als programmaverbruik gebruikt. De programmaduur blijft handmatig, omdat programma's kunnen verschillen.
+
+Voor een extra apparaat kopieer je een `planner_devices`-blok met een nieuwe sleutel. Voeg bij optie B zeven helpers met eigen ID's en een dashboardkaart toe. De sleutel wordt onderdeel van de MQTT-sensor-ID's. Kies een eindtijd binnen de ingestelde forecast-horizon.
+
+## Andere installatiemogelijkheden
+
+| Wat wil je gebruiken? | Kopieer naar AppDaemon | Configuratie |
+|---|---|---|
+| Alleen PV Grid Forecast | `pv_grid_forecast.py` | `pv_grid_forecast:` met `planner_enabled: false` |
+| Forecast met planner | `pv_grid_forecast.py` en `pv_self_consumption.py` | `pv_grid_forecast:` met `planner_enabled: true` |
+| Planner zonder forecast | `pv_self_consumption.py` en `pv_self_consumption_app.py` | [standalone_planner.yaml.example](examples/standalone_planner.yaml.example) als `pv_self_consumption:`-blok |
+| Alleen Phase Guard | `phase_peak_guard.py` | `phase_peak_guard:` uit [apps.yaml.example](examples/apps.yaml.example) |
+
+Gebruik **nooit** tegelijk de geïntegreerde en zelfstandige planner: ze publiceren dezelfde MQTT Discovery-ID's en topics. De zelfstandige planner leest zelf Zonneplan, Solcast, ECU en P1 en gebruikt ruwe Solcast P50 zonder de learning-correctie van PV Grid Forecast. Hij geeft eveneens alleen advies.
+
+Phase Guard heeft drie fase-stroomsensoren in A nodig, of de gedocumenteerde vermogensfallback. Hij publiceert fasebelasting en headroom via MQTT Discovery, maar schakelt niets. De globale headroom is geen harde startbeveiliging voor een apparaat waarvan de fase onbekend is.
+
+## Blueprint en dashboards
+
+De [PV-blueprint](blueprints/automation/pv_negative_price_control.yaml) hoort in Home Assistant onder `blueprints/automation/`, **niet** in de AppDaemon-appsmap. Maak daarna in Home Assistant een automatisering op basis van die blueprint. Hiervoor kies je onder meer je prijssensor, PV-schakelaar, drempel, regelingshelpers, laatste schakelmoment en minimale schakeltijd. Controleer `inverted_switch` tegen je fysieke relais. De blueprint is het enige onderdeel dat de PV-schakelaar bedient.
+
+De vier [dashboardvoorbeelden en hun entiteitenchecklist](dashboards/README.md) zijn optioneel. Ze zijn losse Lovelace-views. De forecast-view gebruikt extra frontend-kaarten; de apparaten- en Phase Guard-view niet.
+
+## Na installatie
+
+- Controleer de AppDaemon-log op fouten en kijk of de MQTT-apparaten online zijn.
+- Controleer de bronentiteiten en hun eenheden: ECU-PV in W, P1-import/export in kW, Solcast `detailedForecast` in kW.
+- Bewaar bestaande JSON-learningbestanden bij een upgrade. Geef zelfstandige apps elk hun eigen opslagpad.
+- Een ontbrekende bron kan `insufficient_data` opleveren; de planner wist dan zijn actuele advies.
+
+De losse projecten blijven beschikbaar als [PV-blueprint](https://github.com/dkwolf1/PV-blueprint), [PV-grid-forecast](https://github.com/dkwolf1/PV-grid-forecast) en [phase-peak-guard](https://github.com/dkwolf1/phase-peak-guard).

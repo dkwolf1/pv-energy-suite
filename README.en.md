@@ -2,123 +2,85 @@
 
 [Nederlands](README.md) · **English**
 
-A modular Home Assistant toolkit for PV forecasting, self-consumption planning,
-phase peak monitoring, and negative electricity price control. The components
-can run independently or work together. The four example dashboard views are
-in [`dashboards/`](dashboards/).
+PV Energy Suite combines PV and price forecasting, appliance start-time advice, phase monitoring and a blueprint for switching PV during negative electricity prices. Each component can also be used on its own.
 
-| Component | File | Purpose |
+## Start here
+
+**Want to try one setup first?** Use PV Grid Forecast with its integrated planner. You need AppDaemon, Home Assistant's MQTT integration, and suitable price, PV and grid sensors. The planner gives advice; it never starts appliances.
+
+1. Copy [apps/pv_grid_forecast.py](apps/pv_grid_forecast.py) and [apps/pv_self_consumption.py](apps/pv_self_consumption.py) to the directory containing your AppDaemon `apps.yaml`.
+2. Open your **existing** AppDaemon `apps.yaml`. Use only the `pv_grid_forecast:` block from [examples/apps.yaml.example](examples/apps.yaml.example) as a reference. Do not replace your whole file. Set `planner_enabled: true` and do **not** add a separate `pv_self_consumption:` block.
+3. Replace the example entity IDs and every `REPLACE_ME` value you use with your own IDs. Check that they exist in Home Assistant under **Developer Tools → States**. The main inputs are listed below.
+4. Choose one appliance setup: **fixed YAML values** for a quick test, or **Home Assistant helpers** for dashboard controls. Both routes are explained below.
+5. Restart AppDaemon. Check its log, then check the `sensor.pv_*` and `sensor.pv_planner_*` entities created through MQTT Discovery.
+
+### Which inputs do you provide?
+
+| Input | Used by | Expected value |
 |---|---|---|
-| PV switching blueprint | [`blueprints/automation/pv_negative_price_control.yaml`](blueprints/automation/pv_negative_price_control.yaml) | Controls the PV switch according to electricity prices and safety settings. It is the only component that switches the PV relay. |
-| PV Grid Forecast | [`apps/pv_grid_forecast.py`](apps/pv_grid_forecast.py) | Publishes PV and price forecasts through MQTT Discovery. It can run the appliance planner internally. |
-| Self-consumption planner | [`apps/pv_self_consumption.py`](apps/pv_self_consumption.py) | Calculates advisory start times for appliances. It never switches an appliance. |
-| Standalone planner adapter | [`apps/pv_self_consumption_app.py`](apps/pv_self_consumption_app.py) | Runs the planner without PV Grid Forecast, using its own Solcast, Zonneplan, ECU and P1 inputs. |
-| Phase Guard | [`apps/phase_peak_guard.py`](apps/phase_peak_guard.py) | Publishes phase load and remaining capacity for monitoring. It does not switch anything. |
+| Zonneplan quarter-hour prices | Forecast and planner | `forecast` attribute with quarter-hour prices |
+| Solcast today and tomorrow | Forecast and planner | `detailedForecast` attribute |
+| ECU/inverter current PV power | Forecast and planner | W |
+| P1 grid import and export | Forecast and planner | kW |
+| Price threshold, automatic control and manual block | Curtailment prediction | Home Assistant helpers |
+| Additional ECU and Zonneplan daily sensors | Forecast learning and financial features | See the example configuration |
 
-## Install
+Example names are not universal Home Assistant entity IDs. AppDaemon does **not** create these source entities. The forecast and planner publish **output** via MQTT Discovery; do not create `sensor.pv_*` or `sensor.pv_planner_*` manually as helpers.
 
-Copy only the Python files you use into your AppDaemon apps directory:
+## Choose how to enter appliances
 
-- **Forecast only:** `pv_grid_forecast.py`.
-- **Forecast with integrated planner:** `pv_grid_forecast.py` and
-  `pv_self_consumption.py`; set `planner_enabled: true` under
-  `pv_grid_forecast:` in `apps.yaml`.
-- **Standalone planner:** `pv_self_consumption.py` and
-  `pv_self_consumption_app.py`; use
-  [`examples/standalone_planner.yaml.example`](examples/standalone_planner.yaml.example).
-- **Phase Guard:** `phase_peak_guard.py`.
+The example includes dishwasher, washing machine and dryer profiles. Their program durations and power values are placeholders; check or measure values for your appliances.
 
-Use [`examples/apps.yaml.example`](examples/apps.yaml.example) as a starting
-point for the integrated setup. Replace every `REPLACE_ME` value and check all
-other example entity IDs against your Home Assistant installation. Copy the
-required blocks into your own `apps.yaml`; do not replace an existing file
-containing other apps. The blueprint is installed separately as a Home
-Assistant automation blueprint.
+### Option A — quick test with fixed YAML values
 
-Run **either** the integrated **or** the standalone planner. Both publish the
-same MQTT Discovery IDs and topics, so running both creates conflicting
-entities. The standalone planner uses raw Solcast P50 without PV Grid
-Forecast's learning correction.
+Remove every field ending in `_entity` from one appliance's `planner_devices` block. Enter `duration_minutes`, `estimated_average_power_w`, `estimated_peak_power_w`, `earliest_start` and `latest_finish`, then set `enabled: true`. With fixed YAML values, that appliance stays in the daily advice until you set `enabled` back to false. Other appliances can remain disabled.
 
-## Configure appliances in Home Assistant
+### Option B — helpers and dashboard
 
-The examples contain dishwasher, washing machine and dryer profiles. Their
-durations and power values are placeholders: enter values for your actual
-programs. The optional
-[`examples/planner_helpers.yaml.example`](examples/planner_helpers.yaml.example)
-defines seven helpers per appliance: a planning request toggle, duration,
-average power, peak power, earliest start, latest finish, and a text field for
-an optional power sensor entity ID.
+1. Enable Home Assistant packages. Add `packages: !include_dir_named packages` under the **existing** `homeassistant:` section of `configuration.yaml`. If that section does not exist yet, use:
 
-To load the helpers as a Home Assistant package, add this to
-`configuration.yaml` if packages are not already enabled:
+   ```yaml
+   homeassistant:
+     packages: !include_dir_named packages
+   ```
 
-```yaml
-homeassistant:
-  packages: !include_dir_named packages
-```
+2. Copy [examples/planner_helpers.yaml.example](examples/planner_helpers.yaml.example) to `packages/pv_planner_helpers.yaml` in the **Home Assistant configuration directory**; remove the `.example` suffix. Restart Home Assistant and check that the helpers exist.
+3. Keep the seven `*_entity` references per appliance from [examples/apps.yaml.example](examples/apps.yaml.example) in your **AppDaemon** `apps.yaml`. Six basic helpers cover planning request, duration, average power, peak power, earliest start and latest finish. The seventh text helper is optional for a power sensor.
+4. Add [dashboards/planner_devices_view.yaml](dashboards/planner_devices_view.yaml) as a **view** in a Home Assistant dashboard. It is not a complete dashboard configuration.
+5. Fill in the helpers. Turn **Plan** on only when a program needs to run; turn it off after starting or completing the cycle. Otherwise the appliance will continue to appear in new advice.
 
-Copy the helper example to `packages/pv_planner_helpers.yaml` in the Home
-Assistant configuration directory, remove the `.example` suffix, and restart
-Home Assistant. Add the matching `*_entity` fields from the AppDaemon example
-to each appliance profile. Then add
-[`dashboards/planner_devices_view.yaml`](dashboards/planner_devices_view.yaml)
-as a dashboard view. Use the Python files from this package for helper support.
-
-Turn an appliance's planning request on only when a cycle needs to run. Turn
-it off after starting or completing the cycle; while it remains on, the
-appliance appears in new daily advice. The planner never starts appliances.
-Missing helpers or invalid numeric values prevent that appliance from being
-planned. Profiles without helper references continue to use fixed YAML
-values; `enabled: true` then means a standing planning request.
+If a required helper is missing or a numeric value is invalid, that appliance is not planned. The planner never starts the appliance.
 
 ### Optional appliance power sensor
 
-Enter a `sensor.*` entity ID in the text helper or set
-`power_sensor_entity: sensor.your_appliance_power` directly in the appliance
-profile. The sensor must report current power in **W** or **kW** and measure
-only that appliance. The planner samples it once a minute and learns average
-and observed peak power from completed cycles. Manual power values remain the
-fallback until a full cycle has been recorded. An idle reading of 0 W is not
-treated as the appliance's predicted cycle demand. Duration remains a manual
-setting because programs on the same appliance can differ.
+Enter an entity ID such as `sensor.dishwasher_power` in the text helper, or set `power_sensor_entity: sensor.dishwasher_power` directly in the appliance profile. The sensor must measure only that appliance and report current power in **W or kW**. The planner samples it once per minute. After a completed cycle, it uses the measured average and observed peak for future advice. Manual values remain the fallback until then; an idle 0 W reading is not used as predicted cycle demand. Duration remains manual because programs can differ.
 
-To add another appliance, duplicate a `planner_devices` profile with a unique
-key, add seven helpers with unique IDs, update its seven `*_entity` references,
-and duplicate the corresponding dashboard card. The profile key becomes part
-of its MQTT sensor IDs. Set a deadline within the forecast horizon.
+To add an appliance, duplicate a `planner_devices` block with a unique key. With option B, add seven helpers with unique IDs and a dashboard card. The key becomes part of its MQTT sensor IDs. Choose a finish deadline within the forecast horizon.
 
-## Required inputs and generated entities
+## Other installation options
 
-| Component | Inputs you provide | Created by this package |
+| What do you want to use? | Copy to AppDaemon | Configuration |
 |---|---|---|
-| Blueprint | Current electricity price, PV switch, automatic-control and manual-block helpers, price threshold, last switch time, minimum switch time; optional temperature sensor and notification settings | No |
-| PV Grid Forecast | Zonneplan quarter-hour prices, Solcast forecasts, ECU current power in W, P1 import/export in kW; additional ECU and Zonneplan day sensors for learning and finance features | MQTT Discovery forecast sensors |
-| Standalone planner | Zonneplan quarter-hour prices, Solcast today/tomorrow, ECU current power, P1 import/export and shared curtailment helpers | MQTT Discovery planner sensors |
-| Phase Guard | Three phase current sensors in A, or its documented power fallback | MQTT Discovery phase sensors |
-| Appliance configuration | Duration, power estimate, time window and optional appliance power sensor | Planner advice sensors; the input helpers are created from the supplied Home Assistant package |
+| PV Grid Forecast only | `pv_grid_forecast.py` | `pv_grid_forecast:` with `planner_enabled: false` |
+| Forecast with planner | `pv_grid_forecast.py` and `pv_self_consumption.py` | `pv_grid_forecast:` with `planner_enabled: true` |
+| Planner without forecast | `pv_self_consumption.py` and `pv_self_consumption_app.py` | The `pv_self_consumption:` block from [standalone_planner.yaml.example](examples/standalone_planner.yaml.example) |
+| Phase Guard only | `phase_peak_guard.py` | The `phase_peak_guard:` block from [apps.yaml.example](examples/apps.yaml.example) |
 
-The example dashboard views and their extra frontend card requirements are
-listed in [`dashboards/README.md`](dashboards/README.md). MQTT Discovery output
-such as `sensor.pv_planner_*` must **not** be created manually as helpers.
+**Never** run the integrated and standalone planners together: they publish the same MQTT Discovery IDs and topics. The standalone planner reads Zonneplan, Solcast, ECU and P1 itself and uses raw Solcast P50 without PV Grid Forecast's learning correction. It also gives advice only.
 
-## Shared behavior and verification
+Phase Guard needs three phase-current sensors in A, or its documented power fallback. It publishes phase load and headroom through MQTT Discovery but switches nothing. Overall headroom is not a hard start safeguard for an appliance whose phase is unknown.
 
-- The blueprint is the only writer of the PV switch. The forecast and planner
-  read the shared threshold and block helpers when calculating predictions.
-- ECU PV power is in W; P1 import and export are in kW. Positive grid power
-  means import. Solcast `detailedForecast` is in kW.
-- Phase Guard's overall headroom is informational; appliance profiles do not
-  assign loads to individual phases.
-- Each standalone app has its own JSON storage file. Keep existing learning
-  files when upgrading, and do not share a storage path between apps.
+## Blueprint and dashboards
 
-After installing, check the AppDaemon log and the MQTT devices. Verify the
-blueprint's `inverted_switch` setting against the physical relay wiring.
-If the standalone planner lacks source data, it publishes
-`insufficient_data` and clears its advice.
+Install the [PV blueprint](blueprints/automation/pv_negative_price_control.yaml) in Home Assistant under `blueprints/automation/`, **not** in the AppDaemon apps directory. Then create an automation from that blueprint in Home Assistant. Select your price sensor, PV switch, threshold, control helpers, last switch time and minimum switch time, among other inputs. Verify `inverted_switch` against the physical relay. The blueprint is the only component that controls the PV switch.
 
-The original components remain available separately in
-[PV-blueprint](https://github.com/dkwolf1/PV-blueprint),
-[PV-grid-forecast](https://github.com/dkwolf1/PV-grid-forecast) and
-[phase-peak-guard](https://github.com/dkwolf1/phase-peak-guard).
+The four [example dashboard views and entity checklist](dashboards/README.md) are optional. They are individual Lovelace views. The forecast view uses extra frontend cards; the appliance and Phase Guard views do not.
+
+## After installation
+
+- Check the AppDaemon log for errors and confirm the MQTT devices are online.
+- Check source entities and units: ECU PV in W, P1 import/export in kW, Solcast `detailedForecast` in kW.
+- Keep existing JSON learning files when upgrading. Give standalone apps separate storage paths.
+- Missing source data can produce `insufficient_data`; the planner then clears its current advice.
+
+The original projects remain available as [PV-blueprint](https://github.com/dkwolf1/PV-blueprint), [PV-grid-forecast](https://github.com/dkwolf1/PV-grid-forecast) and [phase-peak-guard](https://github.com/dkwolf1/phase-peak-guard).
