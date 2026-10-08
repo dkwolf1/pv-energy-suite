@@ -114,7 +114,7 @@ class PhaseRuntime:
 class PhasePeakGuard(hass.Hass):
     """Monitor current, headroom, trends and imbalance on a 3x25 A supply."""
 
-    VERSION = "1.1.1"
+    VERSION = "1.1.2"
 
     def initialize(self) -> None:
         self.service_fuse_amp = self._number("service_fuse_amp", 25.0, 1.0, 200.0)
@@ -199,12 +199,15 @@ class PhasePeakGuard(hass.Hass):
         self.last_log: Dict[str, float] = {}
         self._unknown_units_logged: set[str] = set()
         self.latest_state: Dict[str, Any] = {}
+        self.mqtt_announced_online = False
 
         self._load_data()
         self._publish_discovery()
-        # Remove a retained pre-restart state before declaring this instance online.
-        self._mqtt_publish(f"{self.mqtt_base}/state", "", True)
-        self._mqtt_publish(f"{self.mqtt_base}/availability", "online", True)
+        # Keep retained state valid JSON during a restart. Publishing an empty
+        # retained state makes Home Assistant evaluate every value_json template
+        # against an undefined value. Availability stays offline until the first
+        # fresh state has been published.
+        self._mqtt_publish(f"{self.mqtt_base}/availability", "offline", True)
         self.log("PhaseGuard v%s gestart (alleen monitoren; load shedding uit)", self.VERSION)
         self._log_configuration()
         start = datetime.now().astimezone() + timedelta(seconds=2)
@@ -838,7 +841,7 @@ class PhasePeakGuard(hass.Hass):
             payload: Dict[str, Any] = {
                 "name": definition["name"], "unique_id": f"{self.device_id}_{key}",
                 "default_entity_id": f"sensor.phase_guard_{key}",
-                "state_topic": f"{self.mqtt_base}/state", "value_template": "{{ value_json." + key + " }}",
+                "state_topic": f"{self.mqtt_base}/state", "value_template": self._value_template(key, "unknown"),
                 "availability_topic": f"{self.mqtt_base}/availability",
                 "payload_available": "online", "payload_not_available": "offline", "device": device,
             }
@@ -857,7 +860,7 @@ class PhasePeakGuard(hass.Hass):
             payload = {
                 "name": name, "unique_id": f"{self.device_id}_{key}",
                 "default_entity_id": f"binary_sensor.phase_guard_{key}",
-                "state_topic": f"{self.mqtt_base}/state", "value_template": "{{ value_json." + key + " }}",
+                "state_topic": f"{self.mqtt_base}/state", "value_template": self._value_template(key, "OFF"),
                 "payload_on": "ON", "payload_off": "OFF", "availability_topic": f"{self.mqtt_base}/availability",
                 "payload_available": "online", "payload_not_available": "offline", "device": device, "icon": icon,
             }
@@ -920,6 +923,18 @@ class PhasePeakGuard(hass.Hass):
         if self.mqtt_enabled:
             payload = json.dumps(state, ensure_ascii=False, allow_nan=False, separators=(",", ":"))
             self._mqtt_publish(f"{self.mqtt_base}/state", payload, True)
+            if not self.mqtt_announced_online:
+                self._mqtt_publish(f"{self.mqtt_base}/availability", "online", True)
+                self.mqtt_announced_online = True
+
+    @staticmethod
+    def _value_template(key: str, fallback: str) -> str:
+        """Render safely when an MQTT state message is empty or not JSON."""
+        return (
+            "{% if value_json is defined and '" + key + "' in value_json %}"
+            "{{ value_json." + key + " }}"
+            "{% else %}" + fallback + "{% endif %}"
+        )
 
     def _mqtt_publish(self, topic: str, payload: str, retain: bool = False) -> None:
         if self.mqtt_enabled:
